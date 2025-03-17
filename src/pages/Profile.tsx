@@ -870,7 +870,7 @@ const ProfileComponent: React.FC = () => {
                     fetchFollowers();
                   }}
                 >
-                  <div className="text-xl font-bold">{profileData?.followers_count}</div>
+                  <div className="text-xl font-bold">{profileData?.followers_count || 0}</div>
                   <div className="text-sm text-gray-600">Followers</div>
                 </button>
                 
@@ -881,14 +881,9 @@ const ProfileComponent: React.FC = () => {
                     fetchFollowing();
                   }}
                 >
-                  <div className="text-xl font-bold">{profileData?.following_count}</div>
+                  <div className="text-xl font-bold">{profileData?.following_count || 0}</div>
                   <div className="text-sm text-gray-600">Following</div>
                 </button>
-                
-                <div className="text-center px-4 py-2">
-                  <div className="text-xl font-bold">{profileData?.experiences_count}</div>
-                  <div className="text-sm text-gray-600">Experiences</div>
-                </div>
               </div>
             </div>
           </div>
