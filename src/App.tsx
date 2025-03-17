@@ -171,6 +171,20 @@ const AppHeader = () => {
   );
 };
 
+const AuthRoute = ({ children }: { children: React.ReactNode }) => {
+  const { user, loading } = useAuth();
+  
+  if (loading) {
+    return null; // Don't show loading state for initial auth check
+  }
+  
+  if (!user) {
+    return <LandingPage />;
+  }
+  
+  return <>{children}</>;
+};
+
 const AppRoutes = () => {
   const [isDbInitialized, setIsDbInitialized] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
@@ -208,7 +222,11 @@ const AppRoutes = () => {
       )}
       <div className="flex-grow px-4 pt-4">
         <Routes>
-          <Route path="/" element={<Feed />} />
+          <Route path="/" element={
+            <AuthRoute>
+              <Feed />
+            </AuthRoute>
+          } />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
@@ -234,6 +252,8 @@ const AppRoutes = () => {
 };
 
 const App = () => {
+  const { user } = useAuth();
+
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
@@ -246,7 +266,7 @@ const App = () => {
                 <AppHeader />
                 <AppRoutes />
               </div>
-              <Navbar />
+              {user && <Navbar />}
             </div>
           </AuthProvider>
         </BrowserRouter>
