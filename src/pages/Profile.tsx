@@ -146,6 +146,45 @@ const ProfileComponent: React.FC = () => {
     }
   }, [profileData]);
   
+  // Add real-time subscription for follower count updates
+  useEffect(() => {
+    if (!profileData?.id) return;
+
+    // Subscribe to changes in the user_follows table
+    const channel = supabase
+      .channel('follow-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_follows',
+          filter: `following_id=eq.${profileData.id}`
+        },
+        async () => {
+          // Fetch updated counts
+          const { data, error } = await supabase
+            .from('users')
+            .select('followers_count, following_count')
+            .eq('id', profileData.id)
+            .single();
+            
+          if (!error && data) {
+            setProfileData(prev => prev ? {
+              ...prev,
+              followers_count: data.followers_count,
+              following_count: data.following_count
+            } : null);
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [profileData?.id]);
+
   const fetchProfileData = async () => {
     try {
       setLoading(true);
@@ -346,11 +385,11 @@ const ProfileComponent: React.FC = () => {
         if (error) throw error;
         
         setIsFollowing(false);
+        // Update local state immediately for better UX
         setProfileData(prev => prev ? {
           ...prev,
-          followers_count: prev.followers_count - 1
+          followers_count: Math.max(0, (prev.followers_count || 0) - 1)
         } : null);
-        
       } else {
         // Follow
         const { error } = await supabase
@@ -363,17 +402,17 @@ const ProfileComponent: React.FC = () => {
         if (error) throw error;
         
         setIsFollowing(true);
+        // Update local state immediately for better UX
         setProfileData(prev => prev ? {
           ...prev,
-          followers_count: prev.followers_count + 1
+          followers_count: (prev.followers_count || 0) + 1
         } : null);
       }
-      
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error following/unfollowing:', error);
       toast({
         title: 'Error',
-        description: 'Failed to update follow status. Please try again.',
+        description: 'Failed to update follow status',
         variant: 'destructive'
       });
     } finally {
