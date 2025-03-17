@@ -251,25 +251,31 @@ const AppRoutes = () => {
   );
 };
 
-const App = () => {
+const AppContent = () => {
   const { user } = useAuth();
+  
+  return (
+    <div className="min-h-screen bg-gray-50">
+      <div className="max-w-md mx-auto">
+        <AppHeader />
+        <AppRoutes />
+      </div>
+      {user && <Navbar />}
+    </div>
+  );
+};
 
+const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
         <Sonner />
-        <BrowserRouter>
-          <AuthProvider>
-            <div className="min-h-screen bg-gray-50">
-              <div className="max-w-md mx-auto">
-                <AppHeader />
-                <AppRoutes />
-              </div>
-              {user && <Navbar />}
-            </div>
-          </AuthProvider>
-        </BrowserRouter>
+        <AuthProvider>
+          <BrowserRouter>
+            <AppContent />
+          </BrowserRouter>
+        </AuthProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
