@@ -124,13 +124,16 @@ const activities = [
   "Wildlife"
 ];
 
+// Remove Google Maps type declarations and add Mapbox types
 interface Place {
-  description: string;
-  place_id: string;
-  structured_formatting: {
-    main_text: string;
-    secondary_text: string;
-  };
+  id: string;
+  place_name: string;
+  place_type: string[];
+  text: string;
+  context?: Array<{
+    id: string;
+    text: string;
+  }>;
 }
 
 const CreateTrip = () => {
@@ -155,9 +158,7 @@ const CreateTrip = () => {
   const [userProfile, setUserProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
   const [loadingPlaces, setLoadingPlaces] = useState(false);
-  const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
-  const [apiError, setApiError] = useState<string | null>(null);
-  
+
   // Fetch user profile data
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -173,7 +174,7 @@ const CreateTrip = () => {
         if (error) throw error;
         setUserProfile(data);
       } catch (error) {
-        setApiError('Failed to fetch user profile');
+        console.error('Error fetching user profile:', error);
       }
     };
     
@@ -236,10 +237,10 @@ const CreateTrip = () => {
         .insert([{ name: locationQuery, country: 'Custom' }]);
         
       if (error) {
-        setApiError('Failed to save location');
+        console.error('Error saving location:', error);
       }
     } catch (error) {
-      setApiError('Failed to save location');
+      console.error('Error saving location:', error);
     }
     
     // Set as selected
@@ -288,106 +289,56 @@ const CreateTrip = () => {
     fetchLocations();
   }, []);
   
-  // Load Google Places API
-  useEffect(() => {
-    const loadGooglePlacesAPI = () => {
-      // Check if API is already loaded
-      if (window.google?.maps?.places) {
-        setIsGoogleApiLoaded(true);
-        return;
-      }
-
-      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
-      
-      if (!apiKey) {
-        setApiError('Google Maps API key is missing. Please check your environment variables.');
-        return;
-      }
-
-      // Create script element
-      const script = document.createElement('script');
-      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
-      script.async = true;
-      script.defer = true;
-
-      // Add event listeners
-      script.addEventListener('load', () => {
-        if (window.google?.maps?.places) {
-          setIsGoogleApiLoaded(true);
-          setApiError(null);
-        } else {
-          setApiError(
-            'Failed to initialize Google Maps Places API. Please ensure the Places API is enabled in your Google Cloud Console.'
-          );
-        }
-      });
-
-      script.addEventListener('error', () => {
-        setApiError(
-          'Failed to load Google Maps API. Please check if the API is enabled and the key is valid.'
-        );
-      });
-
-      // Remove any existing Google Maps scripts
-      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
-      if (existingScript) {
-        existingScript.remove();
-      }
-
-      // Append script to document
-      document.head.appendChild(script);
-
-      return () => {
-        if (document.head.contains(script)) {
-          document.head.removeChild(script);
-        }
-      };
-    };
-
-    loadGooglePlacesAPI();
-  }, []);
-
   // Fetch predictions when user types
   useEffect(() => {
     const fetchPredictions = async () => {
-      if (!isGoogleApiLoaded || !locationQuery.trim() || apiError) {
+      if (!locationQuery.trim()) {
         setPredictions([]);
         return;
       }
 
       try {
-        const autocompleteService = new window.google.maps.places.AutocompleteService();
-        
-        autocompleteService.getPlacePredictions(
-          {
-            input: locationQuery,
-            types: ['(cities)'],
-          },
-          (results, status) => {
-            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
-              setPredictions(results as Place[]);
-            } else {
-              setPredictions([]);
-              if (status === window.google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
-                setApiError('API request was denied. Please check your API key.');
-              }
-            }
-          }
-        );
+        setLoadingPlaces(true);
+        const accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+        const endpoint = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(locationQuery)}.json`;
+        const params = new URLSearchParams({
+          access_token: accessToken,
+          types: 'place',
+          limit: '5'
+        });
+
+        const response = await fetch(`${endpoint}?${params}`);
+        const data = await response.json();
+
+        if (data.features) {
+          setPredictions(data.features.map((feature: any) => ({
+            id: feature.id,
+            place_name: feature.place_name,
+            place_type: feature.place_type,
+            text: feature.text,
+            context: feature.context
+          })));
+        }
       } catch (error) {
-        setPredictions([]);
-        setApiError('Failed to fetch location predictions');
+        console.error('Error fetching locations:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to fetch location suggestions',
+          variant: 'destructive'
+        });
+      } finally {
+        setLoadingPlaces(false);
       }
     };
 
     // Debounce the API call
     const timeoutId = setTimeout(fetchPredictions, 300);
     return () => clearTimeout(timeoutId);
-  }, [locationQuery, isGoogleApiLoaded, apiError]);
+  }, [locationQuery]);
 
   const handleLocationSelect = async (place: Place) => {
-    setLocation(place.structured_formatting.main_text);
-    setCountry(place.structured_formatting.secondary_text);
+    setLocation(place.text);
+    setCountry(place.context?.find(ctx => ctx.id.startsWith('country'))?.text || '');
     setLocationQuery('');
     setPredictions([]);
   };
@@ -596,8 +547,8 @@ const CreateTrip = () => {
                       ) : (
                         predictions.map((place) => (
                           <Combobox.Option
-                            key={place.place_id}
-                            value={place.structured_formatting.main_text}
+                            key={place.id}
+                            value={place.text}
                             onClick={() => handleLocationSelect(place)}
                             className={({ active }) =>
                               `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
@@ -608,10 +559,10 @@ const CreateTrip = () => {
                             {({ selected, active }) => (
                               <>
                                 <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
-                                  {place.structured_formatting.main_text}
+                                  {place.text}
                                 </span>
                                 <span className={`block truncate text-sm ${active ? 'text-white/75' : 'text-gray-500'}`}>
-                                  {place.structured_formatting.secondary_text}
+                                  {place.context?.find(ctx => ctx.id.startsWith('country'))?.text || ''}
                                 </span>
                               </>
                             )}
@@ -749,13 +700,6 @@ const CreateTrip = () => {
               ))}
             </div>
           </div>
-          
-          {/* Show API error if any */}
-          {apiError && (
-            <div className="text-red-500 text-sm mt-2">
-              {apiError}
-            </div>
-          )}
           
           {/* Submit Button */}
           <Button 

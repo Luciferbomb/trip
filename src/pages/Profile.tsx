@@ -936,7 +936,15 @@ const ProfileComponent: React.FC = () => {
                             </Button>
                           )}
                         </div>
-                        <p className="mt-2 text-gray-700">{exp.description}</p>
+                        <div 
+                          className="mt-2 text-gray-700 cursor-pointer"
+                          onClick={(e) => {
+                            const target = e.currentTarget;
+                            target.classList.toggle('line-clamp-3');
+                          }}
+                        >
+                          <p className="line-clamp-3">{exp.description}</p>
+                        </div>
                       </div>
                     </div>
                   ))}
