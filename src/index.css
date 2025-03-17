@@ -1,0 +1,165 @@
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 199 89% 48%;
+
+    --radius: 0.75rem;
+
+    --sidebar-background: 0 0% 98%;
+    --sidebar-foreground: 240 5.3% 26.1%;
+    --sidebar-primary: 240 5.9% 10%;
+    --sidebar-primary-foreground: 0 0% 98%;
+    --sidebar-accent: 240 4.8% 95.9%;
+    --sidebar-accent-foreground: 240 5.9% 10%;
+    --sidebar-border: 220 13% 91%;
+    --sidebar-ring: 217.2 91.2% 59.8%;
+  }
+  
+  * {
+    @apply border-border;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+  
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+  }
+  
+  ::selection {
+    @apply bg-hireyth-blue/20 text-hireyth-blue;
+  }
+}
+
+@layer components {
+  .text-balance {
+    text-wrap: balance;
+  }
+  
+  .clip-card {
+    clip-path: inset(0 round 16px);
+  }
+  
+  .glass-card {
+    @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+  
+  .hover-scale {
+    @apply transition-transform duration-500 ease-apple hover:scale-[1.02];
+  }
+  
+  .subtle-shadow {
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+  }
+  
+  .card-shadow {
+    box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.1), 0 0 15px rgba(0, 0, 0, 0.03);
+  }
+  
+  .hero-text-shadow {
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+  }
+  
+  /* Custom Transitions */
+  .page-transition {
+    @apply transition-all duration-500 ease-apple;
+  }
+  
+  .fade-enter {
+    @apply opacity-0;
+  }
+  
+  .fade-enter-active {
+    @apply opacity-100 transition-opacity duration-300 ease-apple;
+  }
+  
+  .fade-exit {
+    @apply opacity-100;
+  }
+  
+  .fade-exit-active {
+    @apply opacity-0 transition-opacity duration-300 ease-apple;
+  }
+}
+
+/* Enhancing form elements */
+input, textarea, select {
+  @apply transition-all duration-300 ease-apple;
+}
+
+button {
+  @apply transition-all duration-300 ease-apple active:scale-[0.98];
+}
+
+/* Enhanced scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-hireyth-blue/20 rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-hireyth-blue/30;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Enhanced hover effects for links */
+a:not(.btn) {
+  @apply relative inline-block;
+}
+
+a:not(.btn)::after {
+  @apply content-[''] absolute bottom-0 left-0 w-0 h-[1px] bg-hireyth-blue transition-all duration-300 ease-apple;
+}
+
+a:not(.btn):hover::after {
+  @apply w-full;
+}
+
+/* Container padding adjustments */
+.container {
+  @apply px-4 md:px-6 lg:px-8;
+}
