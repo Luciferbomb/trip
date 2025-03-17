@@ -1,895 +1,1011 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Image, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Settings, Image, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BottomNav from '@/components/BottomNav';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
-import AppHeader from '@/components/AppHeader';
 import { useToast } from '@/components/ui/use-toast';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { useAuth } from '@/lib/auth-context';
+import AddExperienceDialog from '@/components/AddExperienceDialog';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 
 interface UserProfile {
   id: string;
   name: string;
-  location: string;
+  location: string | null;
   email: string;
-  phone: string;
-  gender: string;
-  profileImage: string;
-  tripsCount: number;
-  experiencesCount: number;
-  bio: string;
-  social: {
-    instagram: string;
-    linkedin: string;
-  };
-  trips: any[];
+  phone: string | null;
+  gender: string | null;
+  profile_image: string;
+  bio: string | null;
+  instagram: string | null;
+  linkedin: string | null;
+  experiences_count: number;
+  followers_count: number;
+  following_count: number;
+  username: string;
 }
 
-const Profile = () => {
-  const { userId } = useParams();
-  const [isOwnProfile] = useState(!userId);
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editedProfile, setEditedProfile] = useState<Partial<UserProfile>>({});
-  const [uploadingImage, setUploadingImage] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+interface Follower {
+  id: string;
+  name: string;
+  username: string;
+  profile_image: string;
+}
+
+interface Trip {
+  id: string;
+  title: string;
+  location: string;
+  image_url: string;
+  start_date: string;
+  end_date: string;
+  spots: number;
+  creator_name: string;
+  creator_image: string;
+  status?: string;
+}
+
+interface DatabaseTripParticipation {
+  status: string;
+  trips: {
+    id: string;
+    title: string;
+    location: string;
+    image_url: string;
+    start_date: string;
+    end_date: string;
+    spots: number;
+    creator_name: string;
+    creator_image: string;
+  };
+}
+
+interface Experience {
+  id: string;
+  title: string;
+  location: string;
+  description: string;
+  image_url: string | null;
+  user_id: string;
+  created_at: string;
+}
+
+interface DatabaseFollowerResponse {
+  follower: {
+    id: string;
+    name: string;
+    username: string;
+    profile_image: string;
+  };
+}
+
+interface DatabaseFollowingResponse {
+  following: {
+    id: string;
+    name: string;
+    username: string;
+    profile_image: string;
+  };
+}
+
+const ProfileComponent: React.FC = () => {
+  const { username } = useParams<{ username: string }>();
+  const { user } = useAuth();
+  const navigate = useNavigate();
   const { toast } = useToast();
+  
+  const [loading, setLoading] = useState(true);
+  const [profileData, setProfileData] = useState<UserProfile | null>(null);
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [editForm, setEditForm] = useState<Partial<UserProfile>>({});
+  const [isSaving, setIsSaving] = useState(false);
+  const [showAddExperience, setShowAddExperience] = useState(false);
+  const [createdTrips, setCreatedTrips] = useState<Trip[]>([]);
+  const [joinedTrips, setJoinedTrips] = useState<Trip[]>([]);
+  const [activeTab, setActiveTab] = useState('experiences');
+  const [showFollowers, setShowFollowers] = useState(false);
+  const [showFollowing, setShowFollowing] = useState(false);
+  const [followers, setFollowers] = useState<Follower[]>([]);
+  const [following, setFollowing] = useState<Follower[]>([]);
+  const [loadingFollowers, setLoadingFollowers] = useState(false);
+  const [loadingFollowing, setLoadingFollowing] = useState(false);
 
   useEffect(() => {
-    const fetchUserProfile = async () => {
+    if (user) {
+      fetchProfileData();
+    }
+  }, [username, user]);
+
+  useEffect(() => {
+    if (profileData) {
+      setEditForm({
+        name: profileData.name,
+        location: profileData.location,
+        phone: profileData.phone,
+        gender: profileData.gender,
+        bio: profileData.bio,
+        instagram: profileData.instagram,
+        linkedin: profileData.linkedin,
+      });
+    }
+  }, [profileData]);
+  
+  const fetchProfileData = async () => {
+    try {
       setLoading(true);
-      try {
-        // Check if the users table exists
-        const { data: tableExists } = await supabase
+      
+      let userData;
+      
+      if (!username && user) {
+        // If no username in URL, fetch current user's profile by ID
+        const { data, error } = await supabase
           .from('users')
-          .select('id')
-          .limit(1);
-        
-        if (tableExists && tableExists.length > 0) {
-          // Fetch user data from Supabase
-          const { data, error } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', userId || 'user123')
-            .single();
+          .select('*')
+          .eq('id', user.id)
+          .single();
           
-          if (error) {
-            console.error('Error fetching user:', error);
-            setUserProfile(mockUser);
-          } else if (data) {
-            // Transform Supabase data to match our UserProfile interface
-            const userTrips = await fetchUserTrips(data.id);
-            
-            setUserProfile({
-              id: data.id,
-              name: data.name,
-              location: data.location,
-              email: data.email,
-              phone: data.phone,
-              gender: data.gender,
-              profileImage: data.profile_image,
-              tripsCount: userTrips.length,
-              experiencesCount: data.experiences_count || 0,
-              bio: data.bio,
-              social: {
-                instagram: data.instagram || '',
-                linkedin: data.linkedin || ''
-              },
-              trips: userTrips
-            });
-          } else {
-            setUserProfile(mockUser);
-          }
-        } else {
-          // Create users table and insert mock data
-          await createUsersTable();
-          await insertMockUsers();
-          setUserProfile(mockUser);
-        }
-      } catch (error) {
-        console.error('Error:', error);
-        setUserProfile(mockUser);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    // Check and create storage bucket if needed
-    const checkAndCreateStorageBucket = async () => {
-      try {
-        // List buckets to check if user-images exists
-        const { data: buckets, error } = await supabase.storage.listBuckets();
-        
-        if (error) {
-          console.error('Error listing buckets:', error);
+        if (error) throw error;
+        if (!data) {
+          toast({
+            title: 'Error',
+            description: 'Could not find your profile.',
+            variant: 'destructive'
+          });
           return;
         }
         
-        const userImagesBucketExists = buckets.some(bucket => bucket.name === 'user-images');
-        
-        if (!userImagesBucketExists) {
-          console.log('Creating user-images bucket');
-          const { error: createError } = await supabase.storage.createBucket('user-images', {
-            public: true,
-            fileSizeLimit: 1024 * 1024 * 2, // 2MB
-            allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-          });
+        userData = data;
+      } else if (username) {
+        // Fetch profile by username
+        const { data, error } = await supabase
+          .from('users')
+          .select('*')
+          .eq('username', username)
+          .single();
           
-          if (createError) {
-            console.error('Error creating bucket:', createError);
-          } else {
-            console.log('user-images bucket created successfully');
-          }
-        } else {
-          console.log('user-images bucket already exists');
+        if (error) throw error;
+        if (!data) {
+          navigate('/404');
+          return;
         }
-      } catch (error) {
-        console.error('Error checking/creating storage bucket:', error);
+        
+        // If viewing own profile, redirect to /profile
+        if (user && data.id === user.id) {
+          navigate('/profile');
+          return;
+        }
+        
+        userData = data;
+      } else {
+        // No username and no user - should not happen
+        navigate('/login');
+        return;
       }
-    };
-
-    fetchUserProfile();
-    checkAndCreateStorageBucket();
-  }, [userId]);
-  
-  const fetchUserTrips = async (userId: string) => {
-    try {
-      const { data, error } = await supabase
+      
+      setProfileData(userData);
+      
+      // Check if current user is following this profile
+      if (user && userData && user.id !== userData.id) {
+        const { data: followData } = await supabase
+          .from('user_follows')
+          .select('*')
+          .eq('follower_id', user.id)
+          .eq('following_id', userData.id)
+          .single();
+          
+        setIsFollowing(!!followData);
+      }
+      
+      // Fetch experiences
+      const { data: experienceData, error: expError } = await supabase
+        .from('experiences')
+        .select('*')
+        .eq('user_id', userData.id)
+        .order('created_at', { ascending: false });
+        
+      if (expError) throw expError;
+      setExperiences(experienceData || []);
+      
+      // Fetch created trips
+      const { data: createdTripsData, error: createdTripsError } = await supabase
         .from('trips')
         .select('*')
-        .eq('creator_id', userId)
-        .limit(2);
+        .eq('creator_id', userData.id)
+        .order('created_at', { ascending: false });
       
-      if (error) {
-        console.error('Error fetching user trips:', error);
-        return mockUser.trips;
-      }
+      if (createdTripsError) throw createdTripsError;
+      setCreatedTrips(createdTripsData || []);
       
-      return data || [];
-    } catch (error) {
-      console.error('Error fetching trips:', error);
-      return mockUser.trips;
-    }
-  };
-  
-  const createUsersTable = async () => {
-    try {
-      // This is a simplified version - in a real app, you would use migrations
-      const { error } = await supabase.rpc('create_users_table');
+      // Fetch joined trips (including pending requests)
+      const { data: participationsData, error: participationsError } = await supabase
+        .from('trip_participants')
+        .select(`
+          status,
+          trips (
+            id,
+            title,
+            location,
+            image_url,
+            start_date,
+            end_date,
+            spots,
+            creator_name,
+            creator_image
+          )
+        `)
+        .eq('user_id', userData.id) as { data: DatabaseTripParticipation[] | null, error: any };
       
-      if (error && error.message !== 'relation "users" already exists') {
-        console.error('Error creating users table:', error);
-      }
-    } catch (error) {
-      console.error('Error creating table:', error);
-    }
-  };
-  
-  const insertMockUsers = async () => {
-    try {
-      const usersToInsert = [
-        {
-          id: 'user123',
-          name: 'Alex Johnson',
-          location: 'San Francisco, CA',
-          email: 'alex.j@example.com',
-          phone: '+1 (555) 123-4567',
-          gender: 'Male',
-          profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-          bio: 'Travel enthusiast and adventure seeker. Always looking for the next exciting destination!',
-          instagram: 'travel_alex',
-          linkedin: 'alex-johnson-travel',
-          experiences_count: 24
-        },
-        {
-          id: 'user456',
-          name: 'Sarah J.',
-          location: 'New York, NY',
-          email: 'sarah.j@example.com',
-          phone: '+1 (555) 987-6543',
-          gender: 'Female',
-          profile_image: 'https://images.unsplash.com/photo-1580489944761-15a19d654956?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-          bio: 'Food lover and cultural explorer. I travel to taste the world!',
-          instagram: 'sarahj_travels',
-          linkedin: 'sarah-j-explorer',
-          experiences_count: 18
-        },
-        {
-          id: 'user789',
-          name: 'Mike T.',
-          location: 'London, UK',
-          email: 'mike.t@example.com',
-          phone: '+44 20 1234 5678',
-          gender: 'Male',
-          profile_image: 'https://images.unsplash.com/photo-1607746882042-944635dfe10e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-          bio: 'Photographer and hiker. I capture the beauty of nature through my lens.',
-          instagram: 'mike_captures',
-          linkedin: 'mike-t-photo',
-          experiences_count: 32
-        },
-        {
-          id: 'user321',
-          name: 'Emma L.',
-          location: 'Sydney, Australia',
-          email: 'emma.l@example.com',
-          phone: '+61 2 9876 5432',
-          gender: 'Female',
-          profile_image: 'https://images.unsplash.com/photo-1494790108377-be9c29b29330?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-          bio: 'Ocean lover and diving enthusiast. The underwater world is my second home.',
-          instagram: 'emma_dives',
-          linkedin: 'emma-l-diver',
-          experiences_count: 15
-        }
-      ];
+      if (participationsError) throw participationsError;
       
-      const { error } = await supabase
-        .from('users')
-        .insert(usersToInsert);
+      const joinedTripsData = (participationsData || [])
+        .filter(p => p.trips)
+        .map(p => ({
+          ...p.trips,
+          status: p.status
+        }));
       
-      if (error) {
-        console.error('Error inserting mock users:', error);
-      }
-    } catch (error) {
-      console.error('Error inserting mock data:', error);
-    }
-  };
-
-  const handleEditToggle = () => {
-    if (isEditing) {
-      // Save changes
-      saveProfileChanges();
-    } else {
-      // Start editing - initialize edited profile with current values
-      setEditedProfile({
-        name: userProfile?.name || '',
-        location: userProfile?.location || '',
-        email: userProfile?.email || '',
-        phone: userProfile?.phone || '',
-        gender: userProfile?.gender || '',
-        bio: userProfile?.bio || '',
-        profileImage: userProfile?.profileImage || '',
-        social: {
-          instagram: userProfile?.social.instagram || '',
-          linkedin: userProfile?.social.linkedin || ''
-        }
-      });
-    }
-    setIsEditing(!isEditing);
-  };
-  
-  const handleInputChange = (field: string, value: string) => {
-    if (field === 'instagram' || field === 'linkedin') {
-      setEditedProfile(prev => ({
-        ...prev,
-        social: {
-          ...prev.social,
-          [field]: value
-        }
-      }));
-    } else {
-      setEditedProfile(prev => ({
-        ...prev,
-        [field]: value
-      }));
-    }
-  };
-  
-  const handleProfileImageClick = () => {
-    if (isOwnProfile && fileInputRef.current) {
-      fileInputRef.current.click();
-    }
-  };
-
-  const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !userProfile) return;
-
-    try {
-      setUploadingImage(true);
-      console.log('Starting profile image upload process');
+      setJoinedTrips(joinedTripsData);
       
-      // Validate file size
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        throw new Error('File size exceeds 2MB limit');
-      }
-      
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        throw new Error('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image');
-      }
-      
-      // Create a unique file name
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${userProfile.id}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-images/${fileName}`;
-      console.log('File path for upload:', filePath);
-      
-      // Try to upload to the user-images bucket
-      console.log('Attempting to upload to Supabase storage bucket: user-images');
-      let uploadResult = await supabase.storage
-        .from('user-images')
-        .upload(filePath, file);
-      
-      // If the first upload fails, try creating the bucket and uploading again
-      if (uploadResult.error) {
-        console.error('Upload error details:', uploadResult.error);
-        
-        // Check if the error is due to bucket not existing
-        if (uploadResult.error.message.includes('bucket') || uploadResult.error.message.includes('not found')) {
-          console.log('Bucket might not exist, trying to create it');
-          
-          // Try to create the bucket
-          const { error: createError } = await supabase.storage.createBucket('user-images', {
-            public: true,
-            fileSizeLimit: 1024 * 1024 * 2, // 2MB
-            allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-          });
-          
-          if (createError) {
-            console.error('Error creating bucket:', createError);
-          } else {
-            console.log('Bucket created, trying upload again');
-            
-            // Try upload again
-            uploadResult = await supabase.storage
-              .from('user-images')
-              .upload(filePath, file);
-          }
-        }
-        
-        // If still error, try uploading to a different bucket as fallback
-        if (uploadResult.error) {
-          console.log('Trying fallback upload to public bucket');
-          uploadResult = await supabase.storage
-            .from('public')
-            .upload(`profile-images/${fileName}`, file);
-            
-          if (uploadResult.error) {
-            console.error('Fallback upload failed:', uploadResult.error);
-            throw new Error('Failed to upload image after multiple attempts');
-          }
-        }
-      }
-      
-      console.log('Upload successful:', uploadResult.data);
-      
-      // Get the public URL from the appropriate bucket
-      const bucketName = uploadResult.error ? 'public' : 'user-images';
-      const { data } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(`profile-images/${fileName}`);
-        
-      const publicUrl = data.publicUrl;
-      console.log('Generated public URL:', publicUrl);
-      
-      // Update the user's profile in the database
-      console.log('Updating user profile with new image URL');
-      const { data: updateData, error: updateError } = await supabase
-        .from('users')
-        .update({ profile_image: publicUrl })
-        .eq('id', userProfile.id);
-        
-      if (updateError) {
-        console.error('Database update error details:', updateError);
-        throw updateError;
-      }
-      
-      console.log('Database update successful:', updateData);
-      
-      // Update local state
-      setUserProfile(prev => {
-        if (!prev) return null;
-        return {
-          ...prev,
-          profileImage: publicUrl
-        };
-      });
-      
-      setEditedProfile(prev => ({
-        ...prev,
-        profileImage: publicUrl
-      }));
-      
-      toast({
-        title: 'Success',
-        description: 'Profile picture updated successfully!'
-      });
-    } catch (error) {
-      console.error('Error uploading image:', error);
+    } catch (error: any) {
+      console.error('Error fetching profile:', error);
       toast({
         title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to update profile picture. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setUploadingImage(false);
-      // Clear the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-  
-  const saveProfileChanges = async () => {
-    if (!userProfile) return;
-    
-    try {
-      setLoading(true);
-      
-      // Prepare data for update
-      const updateData = {
-        name: editedProfile.name,
-        location: editedProfile.location,
-        email: editedProfile.email,
-        phone: editedProfile.phone,
-        gender: editedProfile.gender,
-        bio: editedProfile.bio,
-        instagram: editedProfile.social?.instagram,
-        linkedin: editedProfile.social?.linkedin,
-        profile_image: editedProfile.profileImage
-      };
-      
-      console.log('Updating profile with data:', updateData);
-      
-      // Update in Supabase
-      const { error } = await supabase
-        .from('users')
-        .update(updateData)
-        .eq('id', userProfile.id);
-        
-      if (error) {
-        console.error('Error updating profile:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to update profile. Please try again.',
-          variant: 'destructive'
-        });
-      } else {
-        // Update local state
-        setUserProfile(prev => {
-          if (!prev) return null;
-          return {
-            ...prev,
-            name: editedProfile.name || prev.name,
-            location: editedProfile.location || prev.location,
-            email: editedProfile.email || prev.email,
-            phone: editedProfile.phone || prev.phone,
-            gender: editedProfile.gender || prev.gender,
-            bio: editedProfile.bio || prev.bio,
-            social: {
-              instagram: editedProfile.social?.instagram || prev.social.instagram,
-              linkedin: editedProfile.social?.linkedin || prev.social.linkedin
-            },
-            profileImage: editedProfile.profileImage || prev.profileImage
-          };
-        });
-        
-        toast({
-          title: 'Success',
-          description: 'Profile updated successfully!'
-        });
-      }
-    } catch (error) {
-      console.error('Error:', error);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred. Please try again.',
+        description: 'Failed to load profile. Please try again.',
         variant: 'destructive'
       });
     } finally {
       setLoading(false);
-      setIsEditing(false); // Close edit mode after save attempt
     }
   };
 
+  const handleSaveProfile = async () => {
+    if (!user || !profileData) return;
+    
+    try {
+      setIsSaving(true);
+      
+      const { error } = await supabase
+        .from('users')
+        .update({
+          name: editForm.name,
+          location: editForm.location,
+          phone: editForm.phone,
+          gender: editForm.gender,
+          bio: editForm.bio,
+          instagram: editForm.instagram?.replace('@', ''),
+          linkedin: editForm.linkedin,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setProfileData(prev => prev ? {
+        ...prev,
+        ...editForm,
+        instagram: editForm.instagram?.replace('@', '')
+      } : null);
+      
+      setIsEditMode(false);
+      
+      toast({
+        title: 'Success',
+        description: 'Profile updated successfully!'
+      });
+      
+    } catch (error: any) {
+      console.error('Error updating profile:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update profile. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+  
+  const handleFollow = async () => {
+    if (!user || !profileData) return;
+    
+    try {
+      setFollowLoading(true);
+      
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('user_follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', profileData.id);
+          
+        if (error) throw error;
+        
+        setIsFollowing(false);
+        setProfileData(prev => prev ? {
+          ...prev,
+          followers_count: prev.followers_count - 1
+        } : null);
+        
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('user_follows')
+          .insert({
+            follower_id: user.id,
+            following_id: profileData.id
+          });
+          
+        if (error) throw error;
+        
+        setIsFollowing(true);
+        setProfileData(prev => prev ? {
+          ...prev,
+          followers_count: prev.followers_count + 1
+        } : null);
+      }
+      
+    } catch (error: any) {
+      console.error('Error following/unfollowing:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update follow status. Please try again.',
+        variant: 'destructive'
+      });
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
+  const handleInputChange = (field: string, value: string) => {
+    setEditForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleExperienceAdded = async () => {
+    if (!profileData) return;
+    
+    try {
+      // Fetch updated experiences
+      const { data: experienceData, error: expError } = await supabase
+        .from('experiences')
+        .select('*')
+        .eq('user_id', profileData.id)
+        .order('created_at', { ascending: false });
+        
+      if (expError) throw expError;
+      setExperiences(experienceData || []);
+      
+      // Update profile data to reflect new experiences count
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('experiences_count')
+        .eq('id', profileData.id)
+        .single();
+        
+      if (userError) throw userError;
+      
+      setProfileData(prev => prev ? {
+        ...prev,
+        experiences_count: userData.experiences_count
+      } : null);
+      
+    } catch (error) {
+      console.error('Error refreshing experiences:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to refresh experiences',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const fetchFollowers = async () => {
+    if (!profileData) return;
+    
+    try {
+      setLoadingFollowers(true);
+      
+      const { data, error } = await supabase
+        .from('user_follows')
+        .select(`
+          follower:users!user_follows_follower_id_fkey (
+            id,
+            name,
+            username,
+            profile_image
+          )
+        `)
+        .eq('following_id', profileData.id)
+        .order('created_at', { ascending: false }) as { data: DatabaseFollowerResponse[] | null, error: any };
+        
+      if (error) throw error;
+      
+      const followers = (data || []).map(item => ({
+        id: item.follower.id,
+        name: item.follower.name,
+        username: item.follower.username,
+        profile_image: item.follower.profile_image
+      })) as Follower[];
+      
+      setFollowers(followers);
+      
+    } catch (error) {
+      console.error('Error fetching followers:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load followers',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingFollowers(false);
+    }
+  };
+
+  const fetchFollowing = async () => {
+    if (!profileData) return;
+    
+    try {
+      setLoadingFollowing(true);
+      
+      const { data, error } = await supabase
+        .from('user_follows')
+        .select(`
+          following:users!user_follows_following_id_fkey (
+            id,
+            name,
+            username,
+            profile_image
+          )
+        `)
+        .eq('follower_id', profileData.id)
+        .order('created_at', { ascending: false }) as { data: DatabaseFollowingResponse[] | null, error: any };
+        
+      if (error) throw error;
+      
+      const following = (data || []).map(item => ({
+        id: item.following.id,
+        name: item.following.name,
+        username: item.following.username,
+        profile_image: item.following.profile_image
+      })) as Follower[];
+      
+      setFollowing(following);
+      
+    } catch (error) {
+      console.error('Error fetching following:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load following users',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingFollowing(false);
+    }
+  };
+
+  const handleRemoveFollower = async (followerId: string) => {
+    if (!profileData) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_follows')
+        .delete()
+        .eq('follower_id', followerId)
+        .eq('following_id', profileData.id);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setFollowers(prev => prev.filter(f => f.id !== followerId));
+      setProfileData(prev => prev ? {
+        ...prev,
+        followers_count: prev.followers_count - 1
+      } : null);
+      
+      toast({
+        title: 'Success',
+        description: 'Follower removed'
+      });
+      
+    } catch (error) {
+      console.error('Error removing follower:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to remove follower',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleUnfollow = async (userId: string) => {
+    if (!user || !profileData) return;
+    
+    try {
+      const { error } = await supabase
+        .from('user_follows')
+        .delete()
+        .eq('follower_id', profileData.id)
+        .eq('following_id', userId);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setFollowing(prev => prev.filter(f => f.id !== userId));
+      setProfileData(prev => prev ? {
+        ...prev,
+        following_count: prev.following_count - 1
+      } : null);
+      
+      toast({
+        title: 'Success',
+        description: 'Unfollowed successfully'
+      });
+      
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to unfollow user',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const handleDeleteExperience = async (experienceId: string) => {
+    if (!user || !profileData) return;
+    
+    try {
+      const { error } = await supabase
+        .from('experiences')
+        .delete()
+        .eq('id', experienceId)
+        .eq('user_id', user.id);
+        
+      if (error) throw error;
+      
+      // Update local state
+      setExperiences(prev => prev.filter(exp => exp.id !== experienceId));
+      
+      toast({
+        title: 'Success',
+        description: 'Experience deleted successfully'
+      });
+      
+    } catch (error) {
+      console.error('Error deleting experience:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to delete experience',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const renderTripCard = (trip: Trip) => (
+    <div
+      key={trip.id}
+      className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
+      onClick={() => navigate(`/trips/${trip.id}`)}
+    >
+      <img
+        src={trip.image_url}
+        alt={trip.title}
+        className="w-full h-48 object-cover"
+      />
+      <div className="p-4">
+        <h3 className="font-semibold text-lg">{trip.title}</h3>
+        <p className="text-gray-600">{trip.location}</p>
+        <div className="flex items-center justify-between mt-2">
+          <div className="text-sm text-gray-500">
+            {new Date(trip.start_date).toLocaleDateString()} - {new Date(trip.end_date).toLocaleDateString()}
+          </div>
+          {trip.status && (
+            <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'}>
+              {trip.status}
+            </Badge>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+
+  // Update the followers dialog content
+  const renderFollowersDialog = () => (
+    <Dialog open={showFollowers} onOpenChange={setShowFollowers}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Followers ({followers.length})</DialogTitle>
+        </DialogHeader>
+        <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {loadingFollowers ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : followers.length === 0 ? (
+            <p className="text-center text-gray-500">No followers yet</p>
+          ) : (
+            followers.map((follower) => (
+              <div key={follower.id} className="flex items-center justify-between">
+                <Link 
+                  to={`/profile/${follower.username}`}
+                  className="flex items-center space-x-3"
+                  onClick={() => setShowFollowers(false)}
+                >
+                  <Avatar>
+                    <AvatarImage src={follower.profile_image} alt={follower.name} />
+                    <AvatarFallback>{follower.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{follower.name}</p>
+                    <p className="text-sm text-gray-500">@{follower.username}</p>
+                  </div>
+                </Link>
+              </div>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
+  // Update the following dialog content
+  const renderFollowingDialog = () => (
+    <Dialog open={showFollowing} onOpenChange={setShowFollowing}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Following ({following.length})</DialogTitle>
+        </DialogHeader>
+        <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">
+          {loadingFollowing ? (
+            <div className="flex justify-center py-4">
+              <Loader2 className="w-6 h-6 animate-spin" />
+            </div>
+          ) : following.length === 0 ? (
+            <p className="text-center text-gray-500">Not following anyone yet</p>
+          ) : (
+            following.map((follow) => (
+              <div key={follow.id} className="flex items-center justify-between">
+                <Link 
+                  to={`/profile/${follow.username}`}
+                  className="flex items-center space-x-3"
+                  onClick={() => setShowFollowing(false)}
+                >
+                  <Avatar>
+                    <AvatarImage src={follow.profile_image} alt={follow.name} />
+                    <AvatarFallback>{follow.name[0]}</AvatarFallback>
+                  </Avatar>
+                  <div>
+                    <p className="font-medium">{follow.name}</p>
+                    <p className="text-sm text-gray-500">@{follow.username}</p>
+                  </div>
+                </Link>
+              </div>
+            ))
+          )}
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-hireyth-main"></div>
+      <div className="min-h-screen bg-gray-50">
+        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
+          <Loader2 className="w-8 h-8 animate-spin" />
+        </div>
       </div>
     );
   }
-
-  if (!userProfile) {
+  
+  if (!profileData) {
     return (
-      <div className="min-h-screen bg-gray-50 flex justify-center items-center">
-        <div className="text-center p-6">
-          <h2 className="text-xl font-semibold mb-2">User Not Found</h2>
-          <p className="text-gray-600 mb-4">The user profile you're looking for doesn't exist.</p>
-          <Button asChild>
-            <Link to="/trips">Back to Trips</Link>
-          </Button>
+      <div className="min-h-screen bg-gray-50">
+        <div className="max-w-2xl mx-auto p-4">
+          <div className="text-center">
+            <h1 className="text-2xl font-bold">Profile not found</h1>
+            <p className="text-gray-600 mt-2">The profile you're looking for doesn't exist.</p>
+          </div>
         </div>
       </div>
     );
   }
-
+  
+  const isOwnProfile = user && profileData && user.id === profileData.id;
+  
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Hidden file input for profile image upload */}
-      <input
-        type="file"
-        ref={fileInputRef}
-        onChange={handleProfileImageChange}
-        accept="image/*"
-        className="hidden"
-      />
-      
-      {/* Header */}
-      <AppHeader />
-      
-      {/* Sub Header - only shown when viewing other profiles */}
-      {userId && (
-        <div className="bg-white p-4 flex items-center border-b">
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="mr-2" 
-            asChild
-          >
-            <Link to="/profile">
-              <ChevronRight className="w-5 h-5 rotate-180" />
-            </Link>
-          </Button>
-          <h1 className="text-xl font-semibold">User Profile</h1>
-        </div>
-      )}
-      
-      {/* Profile Header */}
-      <div className="bg-white p-6 shadow-sm">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center">
-            <div className="relative mr-4">
-              <img 
-                src={userProfile.profileImage} 
-                alt={userProfile.name} 
-                className="w-20 h-20 rounded-full object-cover border-2 border-hireyth-main"
+    <div className="min-h-screen bg-gray-50 pb-16">
+      <div className="max-w-2xl mx-auto p-4">
+        {/* Profile Header */}
+        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
+          {/* Cover Image */}
+          <div className="h-32 bg-gradient-to-r from-hireyth-main to-hireyth-main/60" />
+          
+          {/* Profile Info */}
+          <div className="p-6 relative">
+            {/* Profile Image */}
+            <div className="absolute -top-16 left-6">
+              <img
+                src={profileData?.profile_image}
+                alt={profileData?.name}
+                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
               />
-              {isOwnProfile && (
-                <Button 
-                  variant="outline" 
-                  size="icon" 
-                  className="absolute -bottom-2 -right-2 w-8 h-8 rounded-full bg-white"
-                  onClick={handleProfileImageClick}
-                  disabled={uploadingImage}
+            </div>
+            
+            {/* Actions */}
+            <div className="flex justify-end mb-12">
+              {isOwnProfile ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    if (isEditMode) {
+                      handleSaveProfile();
+                    } else {
+                      setIsEditMode(true);
+                    }
+                  }}
+                  disabled={isSaving}
                 >
-                  {uploadingImage ? (
-                    <div className="w-4 h-4 border-2 border-hireyth-main border-t-transparent rounded-full animate-spin" />
+                  {isSaving ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isEditMode ? (
+                    <>
+                      <Save className="w-4 h-4 mr-2" />
+                      Save
+                    </>
                   ) : (
-                    <Camera className="w-4 h-4" />
+                    <>
+                      <Edit className="w-4 h-4 mr-2" />
+                      Edit Profile
+                    </>
+                  )}
+                </Button>
+              ) : (
+                <Button
+                  variant={isFollowing ? "outline" : "default"}
+                  size="sm"
+                  onClick={handleFollow}
+                  disabled={followLoading}
+                >
+                  {followLoading ? (
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                  ) : isFollowing ? (
+                    <>
+                      <UserMinus className="w-4 h-4 mr-2" />
+                      Unfollow
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Follow
+                    </>
                   )}
                 </Button>
               )}
             </div>
-            <div>
-              <h2 className="text-xl font-semibold">{userProfile.name}</h2>
-              <div className="flex items-center text-gray-500 text-sm mt-1">
-                <MapPin className="w-4 h-4 mr-1" />
-                <span>{userProfile.location}</span>
-              </div>
-            </div>
-          </div>
-          
-          {isOwnProfile && (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={handleEditToggle}
-              className="flex items-center gap-1"
-            >
-              {isEditing ? (
-                <>
-                  <Save className="w-4 h-4" />
-                  Save
-                </>
-              ) : (
-                <>
-                  <Edit className="w-4 h-4" />
-                  Edit
-                </>
-              )}
-            </Button>
-          )}
-        </div>
-        
-        {isEditing ? (
-          <div className="mt-4">
-            <Label htmlFor="bio" className="block text-sm font-medium text-gray-700 mb-1">Bio</Label>
-            <Textarea
-              id="bio"
-              value={editedProfile.bio}
-              onChange={(e) => handleInputChange('bio', e.target.value)}
-              placeholder="Tell us about yourself..."
-              className="min-h-[80px]"
-            />
-          </div>
-        ) : (
-          <p className="mt-4 text-gray-600">
-            {userProfile.bio}
-          </p>
-        )}
-        
-        <div className="flex mt-6">
-          <div className="flex-1 text-center">
-            <div className="text-xl font-semibold">{userProfile.tripsCount}</div>
-            <div className="text-sm text-gray-500">Trips</div>
-          </div>
-          <div className="flex-1 text-center">
-            <div className="text-xl font-semibold">{userProfile.experiencesCount}</div>
-            <div className="text-sm text-gray-500">Experiences</div>
-          </div>
-        </div>
-        
-        {!isOwnProfile && (
-          <div className="mt-4 flex gap-2">
-            <Button className="flex-1 bg-hireyth-main hover:bg-hireyth-main/90">Connect</Button>
-            <Button variant="outline" className="flex-1">Message</Button>
-          </div>
-        )}
-      </div>
-      
-      {/* Demographics Section - Now Collapsible */}
-      <div className="mt-4 bg-white shadow-sm">
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="personal-info" className="border-0">
-            <AccordionTrigger className="px-6 py-3">
-              <div className="flex items-center">
-                <User className="w-5 h-5 mr-2 text-hireyth-main" />
-                <span className="text-lg font-semibold">Personal Information</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Full Name</label>
-                  {isEditing ? (
-                    <Input 
-                      value={editedProfile.name} 
-                      onChange={(e) => handleInputChange('name', e.target.value)} 
-                    />
-                  ) : (
-                    <Input value={userProfile.name} readOnly className="bg-gray-50" />
-                  )}
-                </div>
-                
-                <div className="flex gap-4">
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">Email</label>
-                    <div className="flex items-center">
-                      <Mail className="w-4 h-4 text-gray-500 mr-2" />
-                      {isEditing ? (
-                        <Input 
-                          value={editedProfile.email} 
-                          onChange={(e) => handleInputChange('email', e.target.value)} 
-                        />
-                      ) : (
-                        <Input value={userProfile.email} readOnly className="bg-gray-50" />
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex-1">
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
-                    <div className="flex items-center">
-                      <Phone className="w-4 h-4 text-gray-500 mr-2" />
-                      {isEditing ? (
-                        <Input 
-                          value={editedProfile.phone} 
-                          onChange={(e) => handleInputChange('phone', e.target.value)} 
-                        />
-                      ) : (
-                        <Input value={userProfile.phone} readOnly className="bg-gray-50" />
-                      )}
-                    </div>
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Gender</label>
-                  {isEditing ? (
-                    <Input 
-                      value={editedProfile.gender} 
-                      onChange={(e) => handleInputChange('gender', e.target.value)} 
-                    />
-                  ) : (
-                    <Input value={userProfile.gender} readOnly className="bg-gray-50" />
-                  )}
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700">Location</label>
-                  {isEditing ? (
-                    <Input 
-                      value={editedProfile.location} 
-                      onChange={(e) => handleInputChange('location', e.target.value)} 
-                    />
-                  ) : (
-                    <Input value={userProfile.location} readOnly className="bg-gray-50" />
-                  )}
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </div>
-      
-      {/* Social Media Section - Now Collapsible */}
-      <div className="mt-4 bg-white shadow-sm">
-        <Accordion type="single" collapsible className="w-full">
-          <AccordionItem value="social-media" className="border-0">
-            <AccordionTrigger className="px-6 py-3">
-              <div className="flex items-center">
-                <Instagram className="w-5 h-5 mr-2 text-[#E1306C]" />
-                <span className="text-lg font-semibold">Social Media</span>
-              </div>
-            </AccordionTrigger>
-            <AccordionContent className="px-6">
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Instagram</label>
-                  <div className="flex items-center border rounded-md overflow-hidden">
-                    <div className="bg-gray-100 p-2 border-r">
-                      <Instagram className="w-5 h-5 text-[#E1306C]" />
-                    </div>
-                    {isEditing ? (
-                      <Input 
-                        value={editedProfile.social?.instagram} 
-                        onChange={(e) => handleInputChange('instagram', e.target.value)}
-                        className="border-0" 
-                        placeholder="Your Instagram username"
-                      />
-                    ) : (
-                      <Input 
-                        value={userProfile.social.instagram} 
-                        readOnly 
-                        className="border-0 bg-transparent" 
-                      />
-                    )}
-                  </div>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">LinkedIn</label>
-                  <div className="flex items-center border rounded-md overflow-hidden">
-                    <div className="bg-gray-100 p-2 border-r">
-                      <Linkedin className="w-5 h-5 text-[#0077B5]" />
-                    </div>
-                    {isEditing ? (
-                      <Input 
-                        value={editedProfile.social?.linkedin} 
-                        onChange={(e) => handleInputChange('linkedin', e.target.value)}
-                        className="border-0" 
-                        placeholder="Your LinkedIn username"
-                      />
-                    ) : (
-                      <Input 
-                        value={userProfile.social.linkedin} 
-                        readOnly 
-                        className="border-0 bg-transparent" 
-                      />
-                    )}
-                  </div>
-                </div>
-              </div>
-            </AccordionContent>
-          </AccordionItem>
-        </Accordion>
-      </div>
-      
-      {/* Trips Section */}
-      <div className="mt-4 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">{isOwnProfile ? 'My Trips' : 'User Trips'}</h3>
-          <Button variant="ghost" size="sm" className="text-hireyth-main" asChild>
-            <Link to="/trips">View All</Link>
-          </Button>
-        </div>
-        
-        {userProfile.trips.length > 0 ? (
-          <div className="space-y-4">
-            {userProfile.trips.map((trip) => (
-              <div key={trip.id} className="bg-white rounded-lg overflow-hidden shadow-sm">
-                <div className="h-32 relative">
-                  <img 
-                    src={trip.image_url || trip.image} 
-                    alt={trip.title} 
-                    className="w-full h-full object-cover"
+            
+            {/* User Info */}
+            <div className="space-y-4">
+              <div>
+                {isEditMode ? (
+                  <Input
+                    value={editForm.name || ''}
+                    onChange={(e) => handleInputChange('name', e.target.value)}
+                    className="font-bold text-xl mb-1"
+                    placeholder="Your name"
                   />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent"></div>
-                  <div className="absolute bottom-2 left-3 text-white">
-                    <h4 className="font-semibold">{trip.title}</h4>
-                    <div className="flex items-center text-sm">
-                      <MapPin className="w-3 h-3 mr-1" />
-                      <span>{trip.location}</span>
-                    </div>
-                  </div>
+                ) : (
+                  <h1 className="text-2xl font-bold">{profileData?.name}</h1>
+                )}
+                <p className="text-gray-600">@{profileData?.username}</p>
+              </div>
+              
+              {/* Location */}
+              {isEditMode ? (
+                <Input
+                  value={editForm.location || ''}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  className="mt-2"
+                  placeholder="Add your location"
+                />
+              ) : profileData?.location && (
+                <div className="flex items-center text-gray-600">
+                  <MapPin className="w-4 h-4 mr-1" />
+                  <span>{profileData.location}</span>
+                </div>
+              )}
+              
+              {/* Bio */}
+              {isEditMode ? (
+                <Textarea
+                  value={editForm.bio || ''}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  placeholder="Write something about yourself"
+                  className="mt-2"
+                />
+              ) : profileData?.bio && (
+                <p className="text-gray-700">{profileData.bio}</p>
+              )}
+              
+              {/* Stats */}
+              <div className="flex items-center space-x-6 pt-4 border-t">
+                <button
+                  className="text-center hover:bg-gray-50 px-4 py-2 rounded-md transition-colors"
+                  onClick={() => {
+                    setShowFollowers(true);
+                    fetchFollowers();
+                  }}
+                >
+                  <div className="text-xl font-bold">{profileData?.followers_count}</div>
+                  <div className="text-sm text-gray-600">Followers</div>
+                </button>
+                
+                <button
+                  className="text-center hover:bg-gray-50 px-4 py-2 rounded-md transition-colors"
+                  onClick={() => {
+                    setShowFollowing(true);
+                    fetchFollowing();
+                  }}
+                >
+                  <div className="text-xl font-bold">{profileData?.following_count}</div>
+                  <div className="text-sm text-gray-600">Following</div>
+                </button>
+                
+                <div className="text-center px-4 py-2">
+                  <div className="text-xl font-bold">{profileData?.experiences_count}</div>
+                  <div className="text-sm text-gray-600">Experiences</div>
                 </div>
               </div>
-            ))}
+            </div>
           </div>
-        ) : (
-          <div className="text-center py-6 bg-white rounded-lg shadow-sm">
-            <p className="text-gray-500">No trips yet</p>
-            {isOwnProfile && (
-              <Button asChild className="mt-2 bg-hireyth-main hover:bg-hireyth-main/90">
-                <Link to="/create">Create a Trip</Link>
-              </Button>
-            )}
-          </div>
-        )}
-      </div>
-      
-      {/* Experiences */}
-      <div className="mt-4 p-4">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">{isOwnProfile ? 'My Experiences' : 'User Experiences'}</h3>
-          <Button variant="ghost" size="sm" className="text-hireyth-main">
-            View All
-          </Button>
         </div>
         
-        <div className="grid grid-cols-3 gap-2">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <div 
-              key={i} 
-              className="aspect-square bg-gray-200 rounded-md overflow-hidden relative"
-            >
-              <img 
-                src={`https://source.unsplash.com/random/300x300?travel&sig=${i}`} 
-                alt="Travel experience" 
-                className="w-full h-full object-cover"
-              />
+        {/* Tabs Section */}
+        <Tabs defaultValue="experiences" className="w-full">
+          <TabsList className="grid w-full grid-cols-3">
+            <TabsTrigger value="experiences">
+              Experiences ({experiences.length})
+            </TabsTrigger>
+            <TabsTrigger value="created">
+              Created ({createdTrips.length})
+            </TabsTrigger>
+            <TabsTrigger value="joined">
+              Joined ({joinedTrips.length})
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="experiences" className="mt-6">
+            <div className="space-y-6">
+              {isOwnProfile && (
+                <Button
+                  onClick={() => setShowAddExperience(true)}
+                  className="bg-hireyth-main hover:bg-hireyth-main/90"
+                >
+                  Add Experience
+                </Button>
+              )}
+              
+              {experiences.length === 0 ? (
+                <p className="text-center text-gray-600 py-8">
+                  No experiences shared yet
+                </p>
+              ) : (
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                  {experiences.map((exp: Experience) => (
+                    <div key={exp.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
+                      {exp.image_url && (
+                        <img
+                          src={exp.image_url}
+                          alt={exp.title}
+                          className="w-full h-48 object-cover"
+                        />
+                      )}
+                      <div className="p-4">
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <h3 className="font-semibold text-lg">{exp.title}</h3>
+                            <p className="text-gray-600">{exp.location}</p>
+                          </div>
+                          {isOwnProfile && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => handleDeleteExperience(exp.id)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
+                        <p className="mt-2 text-gray-700">{exp.description}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          ))}
-        </div>
+          </TabsContent>
+          
+          <TabsContent value="created" className="mt-6">
+            {createdTrips.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No trips created yet</p>
+                {isOwnProfile && (
+                  <Button
+                    onClick={() => navigate('/create')}
+                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                  >
+                    Create Your First Trip
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                {createdTrips.map(renderTripCard)}
+              </div>
+            )}
+          </TabsContent>
+          
+          <TabsContent value="joined" className="mt-6">
+            {joinedTrips.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No trips joined yet</p>
+                {isOwnProfile && (
+                  <Button
+                    onClick={() => navigate('/trips')}
+                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                  >
+                    Explore Trips
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                {joinedTrips.map(renderTripCard)}
+              </div>
+            )}
+          </TabsContent>
+        </Tabs>
+        
+        {/* Add Experience Dialog */}
+        {isOwnProfile && (
+          <AddExperienceDialog
+            open={showAddExperience}
+            onOpenChange={setShowAddExperience}
+            onExperienceAdded={handleExperienceAdded}
+            userId={user?.id || ''}
+          />
+        )}
+        
+        {/* Followers Dialog */}
+        {renderFollowersDialog()}
+        
+        {/* Following Dialog */}
+        {renderFollowingDialog()}
+        
+        <BottomNav />
       </div>
-      
-      <BottomNav />
     </div>
   );
 };
 
-// Mock user data for fallback
-const mockUser: UserProfile = {
-  id: "user123",
-  name: "Alex Johnson",
-  location: "San Francisco, CA",
-  email: "alex.j@example.com",
-  phone: "+1 (555) 123-4567",
-  gender: "Male",
-  profileImage: "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80",
-  tripsCount: 12,
-  experiencesCount: 24,
-  bio: "Travel enthusiast and adventure seeker. Always looking for the next exciting destination!",
-  social: {
-    instagram: "travel_alex",
-    linkedin: "alex-johnson-travel"
-  },
-  trips: [
-    {
-      id: "trip1",
-      title: "Exploring the Greek Islands",
-      location: "Santorini, Greece",
-      image: "https://images.unsplash.com/photo-1570077188670-e3a8d69ac5ff?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-      startDate: "2023-08-15",
-      endDate: "2023-08-25",
-      spots: 3,
-    },
-    {
-      id: "trip2",
-      title: "Japanese Culture Tour",
-      location: "Tokyo, Japan",
-      image: "https://images.unsplash.com/photo-1536098561742-ca998e48cbcc?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=800&q=80",
-      startDate: "2023-09-10",
-      endDate: "2023-09-22",
-      spots: 2,
-    }
-  ]
-};
-
-export default Profile;
+export default ProfileComponent;

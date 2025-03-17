@@ -3,7 +3,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
 import { useEffect, useState } from "react";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
@@ -24,6 +24,11 @@ import Contact from "./pages/Contact";
 import Explore from "./pages/Explore";
 import Onboarding from "./pages/Onboarding";
 import { supabase } from "./lib/supabase";
+import Search from './pages/Search';
+import EditTrip from "./pages/EditTrip";
+import Feed from '@/components/Feed';
+import Navbar from '@/components/Navbar';
+import Notifications from '@/components/Notifications';
 
 // Add the Google Fonts link for Dancing Script font
 // This would typically go in the index.html file, but for now we'll add it here
@@ -146,6 +151,26 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+const AppHeader = () => {
+  const { user } = useAuth();
+  const navigate = useNavigate();
+
+  return (
+    <header className="bg-white border-b border-gray-200">
+      <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
+        <Link to="/" className="text-xl font-bold text-hireyth-main">
+          Hireyth
+        </Link>
+        {user && (
+          <div className="flex items-center space-x-4">
+            <Notifications />
+          </div>
+        )}
+      </div>
+    </header>
+  );
+};
+
 const AppRoutes = () => {
   const [isDbInitialized, setIsDbInitialized] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
@@ -153,14 +178,12 @@ const AppRoutes = () => {
   useEffect(() => {
     const initDb = async () => {
       try {
-        console.log('Initializing database on app startup...');
         const success = await runMigrations();
         setIsDbInitialized(success);
         if (!success) {
           setDbError('Database initialization failed. Some features may not work properly.');
         }
       } catch (error) {
-        console.error('Error initializing database:', error);
         setDbError('Unexpected error initializing database. Some features may not work properly.');
         setIsDbInitialized(false);
       }
@@ -170,7 +193,7 @@ const AppRoutes = () => {
   }, []);
 
   return (
-    <div className="max-w-md mx-auto min-h-screen bg-hireyth-main flex flex-col">
+    <div className="min-h-screen bg-gray-50 pb-20">
       {dbError && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Database Error:</strong>
@@ -183,34 +206,29 @@ const AppRoutes = () => {
           </span>
         </div>
       )}
-      {isDbInitialized && (
-        <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative" role="alert">
-          <strong className="font-bold">Success: </strong>
-          <span className="block sm:inline">Database initialized successfully!</span>
-        </div>
-      )}
-      <div className="flex-grow">
+      <div className="flex-grow px-4 pt-4">
         <Routes>
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<Feed />} />
           <Route path="/login" element={<Login />} />
           <Route path="/signup" element={<SignUp />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
           <Route path="/trips" element={<ProtectedRoute><Trips /></ProtectedRoute>} />
           <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/profile/:userId" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+          <Route path="/profile/:username" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
           <Route path="/create" element={<ProtectedRoute><CreateTrip /></ProtectedRoute>} />
           <Route path="/trips/:id" element={<ProtectedRoute><TripDetails /></ProtectedRoute>} />
+          <Route path="/trips/:id/edit" element={<ProtectedRoute><EditTrip /></ProtectedRoute>} />
           <Route path="/experiences" element={<ProtectedRoute><div>Experiences Page Coming Soon</div></ProtectedRoute>} />
           <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
           <Route path="/about" element={<About />} />
           <Route path="/terms" element={<Terms />} />
           <Route path="/privacy" element={<Privacy />} />
           <Route path="/contact" element={<Contact />} />
+          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </div>
-      <Footer />
     </div>
   );
 };
@@ -223,7 +241,13 @@ const App = () => {
         <Sonner />
         <BrowserRouter>
           <AuthProvider>
-            <AppRoutes />
+            <div className="min-h-screen bg-gray-50">
+              <div className="max-w-md mx-auto">
+                <AppHeader />
+                <AppRoutes />
+              </div>
+              <Navbar />
+            </div>
           </AuthProvider>
         </BrowserRouter>
       </TooltipProvider>

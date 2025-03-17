@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Bell, X, User, LogOut } from 'lucide-react';
+import { Bell, X, User, LogOut, Search, Menu } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
@@ -20,6 +20,7 @@ import {
 import { useAuth } from '@/lib/auth-context';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { supabase } from '@/lib/supabase';
+import Notifications from './Notifications';
 
 interface Notification {
   id: string;
@@ -33,6 +34,7 @@ interface UserProfile {
   id: string;
   name: string;
   profile_image: string;
+  username: string;
 }
 
 const AppHeader = () => {
@@ -74,7 +76,7 @@ const AppHeader = () => {
       try {
         const { data, error } = await supabase
           .from('users')
-          .select('id, name, profile_image')
+          .select('id, name, profile_image, username')
           .eq('id', user.id)
           .single();
           
@@ -186,8 +188,12 @@ const AppHeader = () => {
   };
 
   const handleLogout = async () => {
-    await signOut();
-    navigate('/login');
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   const getInitials = (name: string) => {
@@ -199,102 +205,68 @@ const AppHeader = () => {
   };
 
   return (
-    <div className="bg-hireyth-main text-white p-4 flex justify-between items-center">
-      <Link to="/trips" className="font-['Dancing_Script'] text-2xl font-bold">
-        Hireyth
-      </Link>
-      
-      <div className="flex items-center space-x-2">
-        <Sheet>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-white relative">
-              <Bell className="w-5 h-5" />
-              {unreadCount > 0 && (
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-red-500">
-                  {unreadCount}
-                </Badge>
-              )}
-            </Button>
-          </SheetTrigger>
-          <SheetContent>
-            <SheetHeader className="border-b pb-4">
-              <div className="flex justify-between items-center">
-                <SheetTitle>Notifications</SheetTitle>
-                {unreadCount > 0 && (
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={markAllAsRead}
-                    className="text-sm text-blue-600"
-                  >
-                    Mark all as read
+    <header className="bg-white border-b sticky top-0 z-50">
+      <div className="max-w-7xl mx-auto px-4 h-16 flex items-center justify-between">
+        <Link to={user ? "/trips" : "/"} className="text-2xl font-bold text-hireyth-main">
+          Hireyth
+        </Link>
+        
+        <div className="flex items-center space-x-4">
+          {user ? (
+            <>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => navigate('/search')}
+                className="text-gray-600 hover:text-gray-900"
+              >
+                <Search className="w-5 h-5" />
+              </Button>
+              
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                    <Avatar className="h-8 w-8">
+                      <AvatarImage src={userProfile?.profile_image} alt={userProfile?.name || ''} />
+                      <AvatarFallback>{userProfile?.name?.charAt(0) || 'U'}</AvatarFallback>
+                    </Avatar>
                   </Button>
-                )}
-              </div>
-            </SheetHeader>
-            <div className="mt-4 space-y-4">
-              {notifications.length > 0 ? (
-                notifications.map(notification => (
-                  <div 
-                    key={notification.id} 
-                    className={`p-3 rounded-lg ${notification.read ? 'bg-gray-50' : 'bg-blue-50'}`}
-                  >
-                    <div className="flex justify-between">
-                      <p className={`text-sm ${notification.read ? 'text-gray-700' : 'text-gray-900 font-medium'}`}>
-                        {notification.message}
-                      </p>
-                      {!notification.read && (
-                        <Button 
-                          variant="ghost" 
-                          size="icon" 
-                          className="h-6 w-6 text-gray-400"
-                          onClick={() => markAsRead(notification.id)}
-                        >
-                          <X className="h-4 w-4" />
-                        </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-56" align="end" forceMount>
+                  <div className="flex items-center justify-start gap-2 p-2">
+                    <div className="flex flex-col space-y-1 leading-none">
+                      {userProfile?.name && (
+                        <p className="font-medium">{userProfile.name}</p>
+                      )}
+                      {userProfile?.username && (
+                        <p className="text-sm text-muted-foreground">
+                          @{userProfile.username}
+                        </p>
                       )}
                     </div>
-                    <p className="text-xs text-gray-500 mt-1">
-                      {formatTimestamp(notification.timestamp)}
-                    </p>
                   </div>
-                ))
-              ) : (
-                <p className="text-center text-gray-500 py-6">No notifications</p>
-              )}
-            </div>
-          </SheetContent>
-        </Sheet>
-        
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-white rounded-full p-0 h-8 w-8 overflow-hidden">
-              {userProfile ? (
-                <Avatar className="h-8 w-8">
-                  <AvatarImage src={userProfile.profile_image} alt={userProfile.name} />
-                  <AvatarFallback>{getInitials(userProfile.name)}</AvatarFallback>
-                </Avatar>
-              ) : (
-                <User className="w-5 h-5" />
-              )}
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem asChild>
+                    <Link to="/profile" className="cursor-pointer">
+                      <User className="mr-2 h-4 w-4" />
+                      <span>Profile</span>
+                    </Link>
+                  </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleLogout} className="text-red-600 cursor-pointer">
+                    <LogOut className="mr-2 h-4 w-4" />
+                    <span>Log out</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </>
+          ) : (
+            <Button onClick={() => navigate('/login')} variant="default">
+              Sign In
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => navigate('/profile')}>
-              My Profile
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => navigate('/trips')}>
-              My Trips
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onClick={handleLogout}>
-              <LogOut className="w-4 h-4 mr-2" />
-              <span>Logout</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+          )}
+        </div>
       </div>
-    </div>
+    </header>
   );
 };
 

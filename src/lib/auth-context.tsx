@@ -82,6 +82,34 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign up with email and password
   const signUp = async (email: string, password: string, userData: any) => {
     try {
+      // First check if email is already registered
+      const { data: existingEmailUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+        
+      if (existingEmailUser) {
+        return { 
+          error: new Error('Email is already registered'), 
+          user: null 
+        };
+      }
+      
+      // Check if username is taken
+      const { data: existingUsernameUser } = await supabase
+        .from('users')
+        .select('id')
+        .eq('username', userData.username)
+        .single();
+        
+      if (existingUsernameUser) {
+        return { 
+          error: new Error('Username is already taken'), 
+          user: null 
+        };
+      }
+      
       // Create the user in Supabase Auth
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -89,7 +117,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           data: {
             name: userData.name,
-            // Add any other metadata you want to store with the user
+            username: userData.username
           },
         },
       });
@@ -98,29 +126,63 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         return { error, user: null };
       }
       
-      // If user was created successfully, add their details to the users table
-      if (data.user) {
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: data.user.id,
-            name: userData.name,
-            email: email,
-            profile_image: userData.profile_image || 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-            created_at: new Date().toISOString(),
-            onboarding_completed: false,
-            // Add any other user data you want to store
-          });
-          
-        if (profileError) {
-          console.error('Error creating user profile:', profileError);
-          return { error: profileError, user: data.user };
-        }
+      if (!data.user) {
+        return { error: new Error('No user data returned from auth signup'), user: null };
       }
-      
+
+      // Check if user profile already exists
+      const { data: existingProfile } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', data.user.id)
+        .single();
+        
+      if (existingProfile) {
+        // Profile already exists, just return the user
+        return { error: null, user: data.user };
+      }
+
+      // Create user profile
+      const { error: profileError } = await supabase
+        .from('users')
+        .insert({
+          id: data.user.id,
+          name: userData.name,
+          username: userData.username,
+          email: email,
+          profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
+          followers_count: 0,
+          following_count: 0,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          onboarding_completed: false
+        });
+
+      if (profileError) {
+        // If profile creation fails, clean up the auth user
+        await supabase.auth.admin.deleteUser(data.user.id);
+        return { error: profileError, user: null };
+      }
+
+      // Create initial notification
+      await supabase
+        .from('notifications')
+        .insert({
+          user_id: data.user.id,
+          type: 'welcome',
+          message: 'Welcome to Hireyth! Complete your profile to get started.',
+          created_at: new Date().toISOString()
+        })
+        .then(({ error }) => {
+          if (error) {
+            console.error('Error creating welcome notification:', error);
+            // Don't fail the signup for notification error
+          }
+        });
+
       return { error: null, user: data.user };
+      
     } catch (error) {
-      console.error('Error signing up:', error);
       return { error, user: null };
     }
   };

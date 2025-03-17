@@ -8,21 +8,44 @@ import { supabase } from './supabase';
 // SQL for creating the trips table
 const createTripsTableSQL = `
 CREATE TABLE IF NOT EXISTS trips (
-  id TEXT PRIMARY KEY,
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
   title TEXT NOT NULL,
-  location TEXT NOT NULL,
   description TEXT,
+  location TEXT NOT NULL,
+  country TEXT,
   image_url TEXT,
-  start_date TIMESTAMP WITH TIME ZONE,
-  end_date TIMESTAMP WITH TIME ZONE,
-  spots INTEGER DEFAULT 1,
-  creator_id TEXT NOT NULL,
+  start_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  end_date TIMESTAMP WITH TIME ZONE NOT NULL,
+  spots INTEGER NOT NULL DEFAULT 1,
+  spots_filled INTEGER NOT NULL DEFAULT 0,
+  creator_id UUID REFERENCES users(id) ON DELETE CASCADE,
   creator_name TEXT,
   creator_image TEXT,
-  country TEXT,
   activity TEXT,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  status TEXT DEFAULT 'active',
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+
+-- Enable RLS
+ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
+
+-- Policies for trips table
+CREATE POLICY "Trips are viewable by everyone" 
+  ON trips FOR SELECT 
+  USING (true);
+
+CREATE POLICY "Users can create their own trips" 
+  ON trips FOR INSERT 
+  WITH CHECK (auth.uid() = creator_id);
+
+CREATE POLICY "Users can update their own trips" 
+  ON trips FOR UPDATE 
+  USING (auth.uid() = creator_id);
+
+CREATE POLICY "Users can delete their own trips" 
+  ON trips FOR DELETE 
+  USING (auth.uid() = creator_id);
 `;
 
 // SQL for creating the users table
@@ -31,6 +54,7 @@ CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   name TEXT NOT NULL,
   email TEXT UNIQUE,
+  username TEXT UNIQUE,
   phone TEXT,
   gender TEXT,
   location TEXT,
@@ -39,8 +63,11 @@ CREATE TABLE IF NOT EXISTS users (
   instagram TEXT,
   linkedin TEXT,
   experiences_count INTEGER DEFAULT 0,
+  followers_count INTEGER DEFAULT 0,
+  following_count INTEGER DEFAULT 0,
   onboarding_completed BOOLEAN DEFAULT FALSE,
-  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 `;
 
@@ -60,13 +87,48 @@ CREATE TABLE IF NOT EXISTS notifications (
 // SQL for creating the trip_participants table
 const createTripParticipantsTableSQL = `
 CREATE TABLE IF NOT EXISTS trip_participants (
-  id TEXT PRIMARY KEY,
-  trip_id TEXT NOT NULL,
-  user_id TEXT NOT NULL,
-  status TEXT DEFAULT 'pending', -- pending, approved, rejected
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  trip_id UUID REFERENCES trips(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  status TEXT NOT NULL DEFAULT 'pending',
+  role TEXT NOT NULL DEFAULT 'participant',
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   UNIQUE(trip_id, user_id)
 );
+
+-- Enable RLS
+ALTER TABLE trip_participants ENABLE ROW LEVEL SECURITY;
+
+-- Policies for trip_participants table
+CREATE POLICY "Participants are viewable by everyone"
+  ON trip_participants FOR SELECT
+  USING (true);
+
+CREATE POLICY "Users can request to join trips"
+  ON trip_participants FOR INSERT
+  WITH CHECK (
+    auth.uid() = user_id AND
+    status = 'pending' AND
+    (
+      SELECT CASE 
+        WHEN spots_filled < spots THEN true
+        ELSE false
+      END
+      FROM trips
+      WHERE id = trip_id
+    )
+  );
+
+CREATE POLICY "Trip creators can manage participants"
+  ON trip_participants FOR UPDATE
+  USING (
+    EXISTS (
+      SELECT 1 FROM trips
+      WHERE id = trip_id
+      AND creator_id = auth.uid()
+    )
+  );
 `;
 
 // SQL for creating the experiences table
@@ -80,6 +142,43 @@ CREATE TABLE IF NOT EXISTS experiences (
   image_url TEXT,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
+`;
+
+// SQL for creating the user_follows table
+const createUserFollowsTableSQL = `
+CREATE TABLE IF NOT EXISTS user_follows (
+  id TEXT PRIMARY KEY DEFAULT uuid_generate_v4(),
+  follower_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  following_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(follower_id, following_id)
+);
+
+-- Create trigger to update followers/following count
+CREATE OR REPLACE FUNCTION update_follow_counts()
+RETURNS TRIGGER AS $$
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    -- Increment followers_count for the user being followed
+    UPDATE users SET followers_count = followers_count + 1 WHERE id = NEW.following_id;
+    -- Increment following_count for the follower
+    UPDATE users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+  ELSIF TG_OP = 'DELETE' THEN
+    -- Decrement followers_count for the user being unfollowed
+    UPDATE users SET followers_count = followers_count - 1 WHERE id = OLD.following_id;
+    -- Decrement following_count for the follower
+    UPDATE users SET following_count = following_count - 1 WHERE id = OLD.follower_id;
+  END IF;
+  RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Create the trigger
+DROP TRIGGER IF EXISTS update_follow_counts_trigger ON user_follows;
+CREATE TRIGGER update_follow_counts_trigger
+AFTER INSERT OR DELETE ON user_follows
+FOR EACH ROW
+EXECUTE FUNCTION update_follow_counts();
 `;
 
 // SQL for adding onboarding_completed field to users table if it doesn't exist
@@ -302,6 +401,27 @@ export const createExperiencesTable = async (): Promise<boolean> => {
 };
 
 /**
+ * Create the user_follows table
+ * @returns Promise<boolean> indicating success or failure
+ */
+export const createUserFollowsTable = async (): Promise<boolean> => {
+  // Try with SQL
+  const sqlSuccess = await executeSQL(createUserFollowsTableSQL);
+  
+  if (sqlSuccess) {
+    return true;
+  }
+  
+  // Fallback to direct insert
+  return await createTableWithInsert('user_follows', {
+    id: 'temp_follow_' + Date.now(),
+    follower_id: 'temp_user1',
+    following_id: 'temp_user2',
+    created_at: new Date().toISOString()
+  });
+};
+
+/**
  * Insert sample data into the users table
  * @returns Promise<boolean> indicating success or failure
  */
@@ -463,6 +583,15 @@ export const runMigrations = async (insertSamples: boolean = true): Promise<bool
     const participantsSuccess = await createTripParticipantsTable();
     if (!participantsSuccess) {
       console.error('Failed to create trip_participants table');
+      return false;
+    }
+  }
+  
+  const userFollowsExists = await checkTableExists('user_follows');
+  if (!userFollowsExists) {
+    const userFollowsSuccess = await createUserFollowsTable();
+    if (!userFollowsSuccess) {
+      console.error('Failed to create user_follows table');
       return false;
     }
   }

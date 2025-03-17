@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Calendar, MapPin, Check, ChevronsUpDown, Plus } from 'lucide-react';
+import { ArrowLeft, Upload, Calendar, MapPin, Check, ChevronsUpDown, Plus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -24,6 +24,73 @@ import { v4 as uuidv4 } from 'uuid';
 import AppHeader from '@/components/AppHeader';
 import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { useAuth } from '@/lib/auth-context';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/components/ui/use-toast';
+import { Combobox } from '@headlessui/react';
+
+// Add at the top of the file after imports
+declare global {
+  interface Window {
+    google: {
+      maps: {
+        places: {
+          AutocompleteService: {
+            new(): {
+              getPlacePredictions(
+                request: {
+                  input: string;
+                  types?: string[];
+                  componentRestrictions?: { country: string };
+                },
+                callback: (
+                  predictions: google.maps.places.AutocompletePrediction[] | null,
+                  status: google.maps.places.PlacesServiceStatus
+                ) => void
+              ): void;
+            };
+          };
+          PlacesServiceStatus: {
+            OK: string;
+            ZERO_RESULTS: string;
+            OVER_QUERY_LIMIT: string;
+            REQUEST_DENIED: string;
+            INVALID_REQUEST: string;
+          };
+        };
+      };
+    };
+  }
+}
+
+// Add Google Maps type definitions
+declare namespace google.maps.places {
+  interface AutocompletePrediction {
+    description: string;
+    place_id: string;
+    structured_formatting: {
+      main_text: string;
+      secondary_text: string;
+    };
+    matched_substrings: Array<{
+      length: number;
+      offset: number;
+    }>;
+    terms: Array<{
+      offset: number;
+      value: string;
+    }>;
+    types: string[];
+  }
+
+  enum PlacesServiceStatus {
+    OK = 'OK',
+    ZERO_RESULTS = 'ZERO_RESULTS',
+    OVER_QUERY_LIMIT = 'OVER_QUERY_LIMIT',
+    REQUEST_DENIED = 'REQUEST_DENIED',
+    INVALID_REQUEST = 'INVALID_REQUEST'
+  }
+}
 
 // Popular cities for location suggestions
 const popularCities = [
@@ -44,34 +111,87 @@ const popularCities = [
   { id: 15, name: 'Istanbul, Turkey', country: 'Turkey' },
 ];
 
+const activities = [
+  "Beach",
+  "Hiking",
+  "Cultural",
+  "Food",
+  "Sightseeing",
+  "Aurora Viewing",
+  "Adventure",
+  "Relaxation",
+  "Photography",
+  "Wildlife"
+];
+
+interface Place {
+  description: string;
+  place_id: string;
+  structured_formatting: {
+    main_text: string;
+    secondary_text: string;
+  };
+}
+
 const CreateTrip = () => {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
   const [image, setImage] = useState<string | null>(null);
   const [title, setTitle] = useState('');
-  const [locationInput, setLocationInput] = useState('');
   const [location, setLocation] = useState('');
+  const [locationQuery, setLocationQuery] = useState('');
+  const [predictions, setPredictions] = useState<Place[]>([]);
   const [country, setCountry] = useState('');
   const [description, setDescription] = useState('');
   const [startDate, setStartDate] = useState<Date | undefined>(undefined);
   const [endDate, setEndDate] = useState<Date | undefined>(undefined);
   const [spots, setSpots] = useState(1);
+  const [selectedActivities, setSelectedActivities] = useState<string[]>([]);
   const [locations, setLocations] = useState(popularCities);
   const [filteredLocations, setFilteredLocations] = useState(popularCities);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [openLocationPopover, setOpenLocationPopover] = useState(false);
+  const [userProfile, setUserProfile] = useState<any>(null);
+  const [loading, setLoading] = useState(false);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+  const [isGoogleApiLoaded, setIsGoogleApiLoaded] = useState(false);
+  const [apiError, setApiError] = useState<string | null>(null);
+  
+  // Fetch user profile data
+  useEffect(() => {
+    const fetchUserProfile = async () => {
+      if (!user) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('users')
+          .select('name, profile_image')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) throw error;
+        setUserProfile(data);
+      } catch (error) {
+        setApiError('Failed to fetch user profile');
+      }
+    };
+    
+    fetchUserProfile();
+  }, [user]);
   
   // Update filtered locations when input changes
   useEffect(() => {
-    if (locationInput) {
+    if (locationQuery) {
       const filtered = locations.filter(city => 
-        city.name.toLowerCase().includes(locationInput.toLowerCase())
+        city.name.toLowerCase().includes(locationQuery.toLowerCase())
       );
       setFilteredLocations(filtered);
       setOpenLocationPopover(true); // Open the popover when typing
     } else {
       setFilteredLocations(locations);
     }
-  }, [locationInput, locations]);
+  }, [locationQuery, locations]);
   
   // Update country when location changes
   useEffect(() => {
@@ -85,16 +205,16 @@ const CreateTrip = () => {
   
   // Function to add a new location
   const addNewLocation = async () => {
-    if (!locationInput.trim()) return;
+    if (!locationQuery.trim()) return;
     
     // Check if location already exists
     const exists = locations.some(city => 
-      city.name.toLowerCase() === locationInput.toLowerCase()
+      city.name.toLowerCase() === locationQuery.toLowerCase()
     );
     
     if (exists) {
-      setLocation(locationInput);
-      setLocationInput("");
+      setLocation(locationQuery);
+      setLocationQuery("");
       setOpenLocationPopover(false);
       return;
     }
@@ -102,7 +222,7 @@ const CreateTrip = () => {
     // Create new location
     const newLocation = {
       id: locations.length + 1,
-      name: locationInput,
+      name: locationQuery,
       country: 'Custom'
     };
     
@@ -113,18 +233,18 @@ const CreateTrip = () => {
     try {
       const { error } = await supabase
         .from('locations')
-        .insert([{ name: locationInput, country: 'Custom' }]);
+        .insert([{ name: locationQuery, country: 'Custom' }]);
         
       if (error) {
-        console.error('Error saving location:', error);
+        setApiError('Failed to save location');
       }
     } catch (error) {
-      console.error('Error saving location:', error);
+      setApiError('Failed to save location');
     }
     
     // Set as selected
-    setLocation(locationInput);
-    setLocationInput("");
+    setLocation(locationQuery);
+    setLocationQuery("");
     setOpenLocationPopover(false);
   };
   
@@ -168,50 +288,142 @@ const CreateTrip = () => {
     fetchLocations();
   }, []);
   
+  // Load Google Places API
+  useEffect(() => {
+    const loadGooglePlacesAPI = () => {
+      // Check if API is already loaded
+      if (window.google?.maps?.places) {
+        setIsGoogleApiLoaded(true);
+        return;
+      }
+
+      const apiKey = import.meta.env.VITE_GOOGLE_MAPS_API_KEY;
+      
+      if (!apiKey) {
+        setApiError('Google Maps API key is missing. Please check your environment variables.');
+        return;
+      }
+
+      // Create script element
+      const script = document.createElement('script');
+      script.src = `https://maps.googleapis.com/maps/api/js?key=${apiKey}&libraries=places`;
+      script.async = true;
+      script.defer = true;
+
+      // Add event listeners
+      script.addEventListener('load', () => {
+        if (window.google?.maps?.places) {
+          setIsGoogleApiLoaded(true);
+          setApiError(null);
+        } else {
+          setApiError(
+            'Failed to initialize Google Maps Places API. Please ensure the Places API is enabled in your Google Cloud Console.'
+          );
+        }
+      });
+
+      script.addEventListener('error', () => {
+        setApiError(
+          'Failed to load Google Maps API. Please check if the API is enabled and the key is valid.'
+        );
+      });
+
+      // Remove any existing Google Maps scripts
+      const existingScript = document.querySelector('script[src*="maps.googleapis.com"]');
+      if (existingScript) {
+        existingScript.remove();
+      }
+
+      // Append script to document
+      document.head.appendChild(script);
+
+      return () => {
+        if (document.head.contains(script)) {
+          document.head.removeChild(script);
+        }
+      };
+    };
+
+    loadGooglePlacesAPI();
+  }, []);
+
+  // Fetch predictions when user types
+  useEffect(() => {
+    const fetchPredictions = async () => {
+      if (!isGoogleApiLoaded || !locationQuery.trim() || apiError) {
+        setPredictions([]);
+        return;
+      }
+
+      try {
+        const autocompleteService = new window.google.maps.places.AutocompleteService();
+        
+        autocompleteService.getPlacePredictions(
+          {
+            input: locationQuery,
+            types: ['(cities)'],
+          },
+          (results, status) => {
+            if (status === window.google.maps.places.PlacesServiceStatus.OK && results) {
+              setPredictions(results as Place[]);
+            } else {
+              setPredictions([]);
+              if (status === window.google.maps.places.PlacesServiceStatus.REQUEST_DENIED) {
+                setApiError('API request was denied. Please check your API key.');
+              }
+            }
+          }
+        );
+      } catch (error) {
+        setPredictions([]);
+        setApiError('Failed to fetch location predictions');
+      }
+    };
+
+    // Debounce the API call
+    const timeoutId = setTimeout(fetchPredictions, 300);
+    return () => clearTimeout(timeoutId);
+  }, [locationQuery, isGoogleApiLoaded, apiError]);
+
+  const handleLocationSelect = async (place: Place) => {
+    setLocation(place.structured_formatting.main_text);
+    setCountry(place.structured_formatting.secondary_text);
+    setLocationQuery('');
+    setPredictions([]);
+  };
+  
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!title || !location || !startDate || !endDate || !description) {
-      alert('Please fill in all required fields');
+    if (!title || !location || !startDate || !endDate || !description || !user) {
+      alert('Please fill in all required fields and ensure you are logged in');
+      return;
+    }
+    
+    if (selectedActivities.length === 0) {
+      alert('Please select at least one activity');
       return;
     }
     
     setIsSubmitting(true);
     
     try {
-      // First, ensure the trips table exists
-      try {
-        console.log('Checking if trips table exists...');
-        const { error: tableCheckError } = await supabase
-          .from('trips')
-          .select('id')
-          .limit(1);
-          
-        if (tableCheckError && tableCheckError.code === '42P01') {
-          console.log('Trips table does not exist, creating it...');
-          
-          // Import the migrations file and run the trips table creation
-          const { createTripsTable } = await import('@/lib/migrations');
-          const success = await createTripsTable();
-          
-          if (!success) {
-            throw new Error('Failed to create trips table');
-          }
-        }
-      } catch (tableError) {
-        console.error('Error checking/creating trips table:', tableError);
-        alert('Error setting up the database. Please try again.');
-        setIsSubmitting(false);
-        return;
-      }
+      setLoading(true);
       
-      // Create a new trip in Supabase
+      // Get user's profile data
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('name, profile_image')
+        .eq('id', user.id)
+        .single();
+      
+      if (userError) throw userError;
+      
+      // Create trip
       const tripId = uuidv4();
-      console.log('Creating trip with ID:', tripId);
       
-      // Ensure dates are properly formatted
-      const formattedStartDate = startDate ? new Date(startDate).toISOString() : null;
-      const formattedEndDate = endDate ? new Date(endDate).toISOString() : null;
+      const formattedStartDate = startDate.toISOString();
+      const formattedEndDate = endDate.toISOString();
       
       const tripData = {
         id: tripId,
@@ -222,43 +434,53 @@ const CreateTrip = () => {
         start_date: formattedStartDate,
         end_date: formattedEndDate,
         spots,
-        creator_id: 'user123', // In a real app, this would be the authenticated user's ID
-        creator_name: 'Alex J.',
-        creator_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
+        spots_filled: 0,
+        creator_id: user.id,
+        creator_name: userData.name || user.user_metadata?.name || 'Anonymous',
+        creator_image: userData.profile_image || 'https://via.placeholder.com/200',
         created_at: new Date().toISOString(),
         country: country || location.split(',').pop()?.trim() || '',
-        activity: 'Travel, Sightseeing'
+        activity: selectedActivities.join(', '),
+        status: 'active'
       };
       
-      console.log('Trip data to be inserted:', tripData);
-      
-      // Now insert the trip
-      const { data, error } = await supabase
+      const { data: tripInsertData, error: tripError } = await supabase
         .from('trips')
         .insert(tripData)
-        .select();
+        .select()
+        .single();
       
-      if (error) {
-        console.error('Error creating trip:', error);
-        console.error('Error details:', error.message, error.details, error.hint);
-        
-        if (error.code === '23505') { // Unique violation
-          alert('A trip with this ID already exists. Please try again.');
-        } else if (error.code === '42P01') { // Undefined table
-          alert('The trips table does not exist. Please refresh the page and try again.');
-        } else {
-          alert(`Failed to create trip: ${error.message}. Please try again.`);
-        }
-      } else {
-        console.log('Trip created successfully:', data);
-        alert('Trip created successfully!');
-        navigate('/trips');
-      }
-    } catch (error) {
-      console.error('Unexpected error:', error);
-      alert('An unexpected error occurred. Please try again.');
+      if (tripError) throw tripError;
+      
+      // Add creator as participant
+      const { error: participantError } = await supabase
+        .from('trip_participants')
+        .insert({
+          trip_id: tripId,
+          user_id: user.id,
+          status: 'approved',
+          role: 'creator'
+        });
+      
+      if (participantError) throw participantError;
+      
+      toast({
+        title: 'Success',
+        description: 'Trip created successfully!'
+      });
+      
+      navigate(`/trips/${tripInsertData.id}`);
+      
+    } catch (error: any) {
+      console.error('Error creating trip:', error);
+      toast({
+        title: 'Error',
+        description: error.message,
+        variant: 'destructive'
+      });
     } finally {
       setIsSubmitting(false);
+      setLoading(false);
     }
   };
   
@@ -275,9 +497,6 @@ const CreateTrip = () => {
   
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      {/* Header */}
-      <AppHeader />
-      
       {/* Sub Header */}
       <div className="bg-white p-4 flex items-center border-b">
         <Button 
@@ -360,47 +579,53 @@ const CreateTrip = () => {
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-full p-0">
-                <Command>
-                  <div className="flex items-center border-b px-3">
-                    <MapPin className="mr-2 h-4 w-4 shrink-0 opacity-50" />
-                    <Input
-                      placeholder="Search location..."
-                      value={locationInput}
-                      onChange={(e) => setLocationInput(e.target.value)}
-                      className="flex h-10 w-full rounded-md bg-transparent py-3 text-sm outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50 border-0"
-                      autoFocus
+                <div className="relative">
+                  <Combobox value={location} onChange={setLocation} as="div">
+                    <Combobox.Input
+                      className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2"
+                      onChange={(e) => setLocationQuery(e.target.value)}
+                      value={locationQuery}
+                      placeholder="Search for a city"
+                      displayValue={(value: any) => value || ''}
                     />
-                  </div>
-                  <CommandEmpty>
-                    <div className="p-2">
-                      <Button 
-                        variant="outline" 
-                        className="w-full justify-start text-sm" 
-                        onClick={addNewLocation}
-                      >
-                        <Plus className="mr-2 h-4 w-4" />
-                        Add "{locationInput}"
-                      </Button>
+                    <Combobox.Options className="absolute z-50 mt-1 max-h-60 w-full overflow-auto rounded-md bg-white py-1 text-base shadow-lg ring-1 ring-black ring-opacity-5 focus:outline-none sm:text-sm">
+                      {predictions.length === 0 && locationQuery !== '' ? (
+                        <div className="relative cursor-default select-none px-4 py-2 text-gray-700">
+                          No results found
+                        </div>
+                      ) : (
+                        predictions.map((place) => (
+                          <Combobox.Option
+                            key={place.place_id}
+                            value={place.structured_formatting.main_text}
+                            onClick={() => handleLocationSelect(place)}
+                            className={({ active }) =>
+                              `relative cursor-pointer select-none py-2 pl-3 pr-9 ${
+                                active ? 'bg-hireyth-blue text-white' : 'text-gray-900'
+                              }`
+                            }
+                          >
+                            {({ selected, active }) => (
+                              <>
+                                <span className={`block truncate ${selected ? 'font-medium' : 'font-normal'}`}>
+                                  {place.structured_formatting.main_text}
+                                </span>
+                                <span className={`block truncate text-sm ${active ? 'text-white/75' : 'text-gray-500'}`}>
+                                  {place.structured_formatting.secondary_text}
+                                </span>
+                              </>
+                            )}
+                          </Combobox.Option>
+                        ))
+                      )}
+                    </Combobox.Options>
+                  </Combobox>
+                  {loadingPlaces && (
+                    <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
                     </div>
-                  </CommandEmpty>
-                  <CommandList>
-                    <CommandGroup>
-                      {filteredLocations.map((city) => (
-                        <CommandItem
-                          key={city.id}
-                          value={city.name}
-                          onSelect={(currentValue) => {
-                            setLocation(currentValue);
-                            setLocationInput("");
-                            setOpenLocationPopover(false);
-                          }}
-                        >
-                          {city.name}
-                        </CommandItem>
-                      ))}
-                    </CommandGroup>
-                  </CommandList>
-                </Command>
+                  )}
+                </div>
               </PopoverContent>
             </Popover>
           </div>
@@ -500,13 +725,52 @@ const CreateTrip = () => {
             />
           </div>
           
+          {/* Activities */}
+          <div>
+            <Label className="block text-sm font-medium text-gray-700 mb-2">
+              Activities
+            </Label>
+            <div className="flex flex-wrap gap-2">
+              {activities.map((activity) => (
+                <Badge
+                  key={activity}
+                  variant={selectedActivities.includes(activity) ? 'default' : 'outline'}
+                  className="cursor-pointer"
+                  onClick={() => {
+                    if (selectedActivities.includes(activity)) {
+                      setSelectedActivities(prev => prev.filter(a => a !== activity));
+                    } else {
+                      setSelectedActivities(prev => [...prev, activity]);
+                    }
+                  }}
+                >
+                  {activity}
+                </Badge>
+              ))}
+            </div>
+          </div>
+          
+          {/* Show API error if any */}
+          {apiError && (
+            <div className="text-red-500 text-sm mt-2">
+              {apiError}
+            </div>
+          )}
+          
           {/* Submit Button */}
           <Button 
             type="submit" 
             className="w-full bg-hireyth-main hover:bg-hireyth-main/90"
-            disabled={isSubmitting}
+            disabled={isSubmitting || loading}
           >
-            {isSubmitting ? 'Creating Trip...' : 'Create Trip'}
+            {loading ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Creating Trip...
+              </>
+            ) : (
+              'Create Trip'
+            )}
           </Button>
         </form>
       </div>

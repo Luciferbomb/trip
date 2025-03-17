@@ -1,9 +1,12 @@
-import React from 'react';
-import { Calendar, Users, MapPin, ArrowRight } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Calendar, Users, MapPin, ArrowRight, UserPlus, UserMinus, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/lib/auth-context';
+import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
 interface TripCardProps {
   id: string;
@@ -15,7 +18,7 @@ interface TripCardProps {
   spots: number;
   creatorImage: string;
   creatorName: string;
-  creatorId?: string;
+  creatorId: string;
   featured?: boolean;
 }
 
@@ -29,9 +32,94 @@ const TripCard = ({
   spots,
   creatorImage,
   creatorName,
-  creatorId = "user123", // Default creator ID for demo
+  creatorId,
   featured = false
 }: TripCardProps) => {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [isFollowing, setIsFollowing] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
+  
+  // Check if user is following the creator
+  useEffect(() => {
+    const checkFollowStatus = async () => {
+      if (!user || user.id === creatorId) return;
+      
+      try {
+        const { data, error } = await supabase
+          .from('user_follows')
+          .select('*')
+          .eq('follower_id', user.id)
+          .eq('following_id', creatorId)
+          .single();
+          
+        if (error && error.code !== 'PGRST116') throw error;
+        setIsFollowing(!!data);
+      } catch (error) {
+        console.error('Error checking follow status:', error);
+      }
+    };
+    
+    checkFollowStatus();
+  }, [user, creatorId]);
+  
+  const handleFollow = async (e: React.MouseEvent) => {
+    e.preventDefault(); // Prevent card click
+    e.stopPropagation();
+    
+    if (!user) {
+      navigate('/login');
+      return;
+    }
+    
+    try {
+      setFollowLoading(true);
+      
+      if (isFollowing) {
+        // Unfollow
+        const { error } = await supabase
+          .from('user_follows')
+          .delete()
+          .eq('follower_id', user.id)
+          .eq('following_id', creatorId);
+          
+        if (error) throw error;
+        
+        setIsFollowing(false);
+        toast({
+          title: 'Success',
+          description: `Unfollowed ${creatorName}`
+        });
+      } else {
+        // Follow
+        const { error } = await supabase
+          .from('user_follows')
+          .insert({
+            follower_id: user.id,
+            following_id: creatorId
+          });
+          
+        if (error) throw error;
+        
+        setIsFollowing(true);
+        toast({
+          title: 'Success',
+          description: `Now following ${creatorName}`
+        });
+      }
+    } catch (error: any) {
+      console.error('Error following/unfollowing:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update follow status',
+        variant: 'destructive'
+      });
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+  
   // Format dates
   const formatDate = (dateString: string) => {
     try {
@@ -93,14 +181,44 @@ const TripCard = ({
         
         {/* Creator */}
         <div className="flex items-center justify-between">
-          <Link to={`/profile/${creatorId}`} className="flex items-center space-x-2 hover:text-hireyth-blue transition-colors">
-            <img
-              src={creatorImage}
-              alt={creatorName}
-              className="w-8 h-8 rounded-full object-cover"
-            />
-            <span className="text-sm text-gray-700">by {creatorName}</span>
-          </Link>
+          <div className="flex items-center space-x-4">
+            <Link 
+              to={`/profile/${creatorId}`} 
+              className="flex items-center space-x-2 hover:text-hireyth-blue transition-colors"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <img
+                src={creatorImage}
+                alt={creatorName}
+                className="w-8 h-8 rounded-full object-cover"
+              />
+              <span className="text-sm text-gray-700">by {creatorName}</span>
+            </Link>
+            
+            {user && user.id !== creatorId && (
+              <Button
+                variant={isFollowing ? "outline" : "default"}
+                size="sm"
+                onClick={handleFollow}
+                disabled={followLoading}
+                className="ml-2"
+              >
+                {followLoading ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : isFollowing ? (
+                  <>
+                    <UserMinus className="w-4 h-4 mr-1" />
+                    Unfollow
+                  </>
+                ) : (
+                  <>
+                    <UserPlus className="w-4 h-4 mr-1" />
+                    Follow
+                  </>
+                )}
+              </Button>
+            )}
+          </div>
           
           <Button asChild variant="ghost" size="sm" className="p-0 h-auto hover:bg-transparent group-hover:text-hireyth-blue">
             <Link to={`/trips/${id}`} className="flex items-center space-x-1">
