@@ -198,6 +198,13 @@ const ProfileComponent: React.FC = () => {
         return;
       }
       
+      // Ensure followers_count and following_count are initialized
+      userData = {
+        ...userData,
+        followers_count: userData.followers_count || 0,
+        following_count: userData.following_count || 0
+      };
+      
       setProfileData(userData);
       
       // Check if current user is following this profile
@@ -870,7 +877,7 @@ const ProfileComponent: React.FC = () => {
                     fetchFollowers();
                   }}
                 >
-                  <div className="text-xl font-bold">{profileData?.followers_count || 0}</div>
+                  <div className="text-xl font-bold">{profileData?.followers_count ?? 0}</div>
                   <div className="text-sm text-gray-600">Followers</div>
                 </button>
                 
@@ -881,7 +888,7 @@ const ProfileComponent: React.FC = () => {
                     fetchFollowing();
                   }}
                 >
-                  <div className="text-xl font-bold">{profileData?.following_count || 0}</div>
+                  <div className="text-xl font-bold">{profileData?.following_count ?? 0}</div>
                   <div className="text-sm text-gray-600">Following</div>
                 </button>
               </div>

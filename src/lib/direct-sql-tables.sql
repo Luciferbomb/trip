@@ -107,9 +107,14 @@ RETURNS TRIGGER AS $$
 BEGIN
     IF TG_OP = 'INSERT' THEN
         -- Increment followers_count for the user being followed
-        UPDATE users SET followers_count = GREATEST(followers_count + 1, 0) WHERE id = NEW.following_id;
+        UPDATE users 
+        SET followers_count = COALESCE(followers_count, 0) + 1 
+        WHERE id = NEW.following_id;
+        
         -- Increment following_count for the follower
-        UPDATE users SET following_count = GREATEST(following_count + 1, 0) WHERE id = NEW.follower_id;
+        UPDATE users 
+        SET following_count = COALESCE(following_count, 0) + 1 
+        WHERE id = NEW.follower_id;
         
         -- Create notification for new follower
         INSERT INTO notifications (user_id, type, message, related_id)
@@ -118,9 +123,14 @@ BEGIN
                NEW.follower_id::text);
     ELSIF TG_OP = 'DELETE' THEN
         -- Decrement followers_count for the user being unfollowed
-        UPDATE users SET followers_count = GREATEST(followers_count - 1, 0) WHERE id = OLD.following_id;
+        UPDATE users 
+        SET followers_count = GREATEST(COALESCE(followers_count, 0) - 1, 0) 
+        WHERE id = OLD.following_id;
+        
         -- Decrement following_count for the follower
-        UPDATE users SET following_count = GREATEST(following_count - 1, 0) WHERE id = OLD.follower_id;
+        UPDATE users 
+        SET following_count = GREATEST(COALESCE(following_count, 0) - 1, 0) 
+        WHERE id = OLD.follower_id;
     END IF;
     RETURN NULL;
 END;
