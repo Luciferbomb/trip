@@ -707,6 +707,20 @@ const ProfileComponent: React.FC = () => {
     </Dialog>
   );
 
+  const handleLogout = async () => {
+    try {
+      await supabase.auth.signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error logging out:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to log out',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -1009,6 +1023,16 @@ const ProfileComponent: React.FC = () => {
         
         {/* Following Dialog */}
         {renderFollowingDialog()}
+        
+        {!username && (
+          <Button 
+            variant="destructive" 
+            className="w-full mt-4"
+            onClick={handleLogout}
+          >
+            Log Out
+          </Button>
+        )}
         
         <BottomNav />
       </div>
