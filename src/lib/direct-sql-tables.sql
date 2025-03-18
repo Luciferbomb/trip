@@ -300,16 +300,24 @@ GRANT ALL ON ALL TABLES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 GRANT ALL ON ALL FUNCTIONS IN SCHEMA public TO authenticated;
 
--- Drop existing storage policies
-DROP POLICY IF EXISTS "Anyone can view profile images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can upload profile images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can view trip images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can upload trip images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can delete own profile images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can delete own trip images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can view experience images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can upload experience images" ON storage.objects;
-DROP POLICY IF EXISTS "Anyone can delete own experience images" ON storage.objects;
+-- Drop ALL existing storage policies
+DO $$ 
+BEGIN
+    -- Drop all existing policies on storage.objects
+    DROP POLICY IF EXISTS "Public Access" ON storage.objects;
+    DROP POLICY IF EXISTS "Authenticated users can upload images" ON storage.objects;
+    DROP POLICY IF EXISTS "Users can update their own images" ON storage.objects;
+    DROP POLICY IF EXISTS "Users can delete their own images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can view profile images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can upload profile images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can view trip images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can upload trip images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can delete own profile images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can delete own trip images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can view experience images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can upload experience images" ON storage.objects;
+    DROP POLICY IF EXISTS "Anyone can delete own experience images" ON storage.objects;
+END $$;
 
 -- Enable RLS on storage.objects
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
@@ -330,26 +338,33 @@ BEGIN
     ON CONFLICT (id) DO NOTHING;
 END $$;
 
--- Set up storage policies with proper bucket checks
-CREATE POLICY "Public Access"
-    ON storage.objects FOR SELECT
-    TO public
-    USING (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
+-- Set up new storage policies
+DO $$ 
+BEGIN
+    -- Create policy for public access to images
+    CREATE POLICY "storage_public_access"
+        ON storage.objects FOR SELECT
+        TO public
+        USING (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
 
-CREATE POLICY "Authenticated users can upload images"
-    ON storage.objects FOR INSERT
-    TO authenticated
-    WITH CHECK (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
+    -- Create policy for authenticated users to upload images
+    CREATE POLICY "storage_auth_upload"
+        ON storage.objects FOR INSERT
+        TO authenticated
+        WITH CHECK (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
 
-CREATE POLICY "Users can update their own images"
-    ON storage.objects FOR UPDATE
-    TO authenticated
-    USING (auth.uid()::text = owner);
+    -- Create policy for users to update their own images
+    CREATE POLICY "storage_auth_update"
+        ON storage.objects FOR UPDATE
+        TO authenticated
+        USING (auth.uid()::text = owner);
 
-CREATE POLICY "Users can delete their own images"
-    ON storage.objects FOR DELETE
-    TO authenticated
-    USING (auth.uid()::text = owner);
+    -- Create policy for users to delete their own images
+    CREATE POLICY "storage_auth_delete"
+        ON storage.objects FOR DELETE
+        TO authenticated
+        USING (auth.uid()::text = owner);
+END $$;
 
 -- Grant necessary permissions
 GRANT ALL ON storage.objects TO authenticated;
