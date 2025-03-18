@@ -6,9 +6,27 @@ const supabaseAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYm
 const supabaseServiceRoleKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imx2a3h1Z295dGRweWpxcGtmbWRyIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc0MjIyODU0MCwiZXhwIjoyMDU3ODA0NTQwfQ.NRVb0fIj3LP7Ej9c-zvyF6EoEzvFhM00kSYwRrFonMI';
 
 // Create a Supabase client with the service role key for admin operations
-export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey);
+export const supabaseAdmin = createClient(supabaseUrl, supabaseServiceRoleKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    storage: globalThis?.localStorage,
+    storageKey: 'supabase-auth-token'
+  }
+});
 
 // Create a regular Supabase client for normal user operations
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    autoRefreshToken: true,
+    persistSession: true,
+    detectSessionInUrl: true,
+    flowType: 'pkce',
+    storage: globalThis?.localStorage,
+    storageKey: 'supabase-auth-token'
+  }
+});
 
 export default supabase; 
