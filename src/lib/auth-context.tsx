@@ -82,36 +82,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign up with email and password
   const signUp = async (email: string, password: string, userData: any) => {
     try {
-      // First check if email is already registered
-      const { data: existingEmailUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .maybeSingle();
-      
-      if (existingEmailUser) {
-        return { 
-          error: { message: 'Email is already registered' }, 
-          user: null 
-        };
-      }
-      
-      // Check if username is taken
-      const { data: existingUsernameUser } = await supabase
-        .from('users')
-        .select('id')
-        .eq('username', userData.username)
-        .maybeSingle();
-      
-      if (existingUsernameUser) {
-        return { 
-          error: { message: 'Username is already taken' }, 
-          user: null 
-        };
-      }
-      
-      // Create the user in Supabase Auth
-      const { data, error: authError } = await supabase.auth.signUp({
+      // Create the user in Supabase Auth first
+      const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -123,52 +95,82 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       });
       
       if (authError) {
+        if (authError.message?.includes('already registered')) {
+          return { error: { message: 'Email is already registered' }, user: null };
+        }
         return { error: authError, user: null };
       }
       
-      if (!data.user) {
+      if (!authData.user) {
         return { error: { message: 'No user data returned from auth signup' }, user: null };
       }
 
-      // Wait a short time to ensure auth user is fully created
-      await new Promise(resolve => setTimeout(resolve, 1000));
+      // Wait for auth to complete
+      await new Promise(resolve => setTimeout(resolve, 1500));
 
-      // Create user profile
-      const { error: profileError } = await supabase
-        .from('users')
-        .insert({
-          id: data.user.id,
-          name: userData.name,
-          username: userData.username,
-          email: email,
-          profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-          followers_count: 0,
-          following_count: 0,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-          onboarding_completed: false
-        });
+      try {
+        // Create user profile
+        const { error: profileError } = await supabase
+          .from('users')
+          .insert({
+            id: authData.user.id,
+            name: userData.name,
+            username: userData.username,
+            email: email,
+            profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
+            followers_count: 0,
+            following_count: 0,
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString(),
+            onboarding_completed: false
+          })
+          .select()
+          .single();
 
-      if (profileError) {
-        // If profile creation fails, delete the auth user
-        await supabase.auth.admin.deleteUser(data.user.id);
-        
-        if (profileError.code === '23505') {
-          if (profileError.message?.includes('users_email_key')) {
-            return { error: { message: 'Email is already registered' }, user: null };
+        if (profileError) {
+          // If profile creation fails, clean up the auth user
+          await supabase.auth.admin.deleteUser(authData.user.id);
+          
+          if (profileError.message?.includes('duplicate key')) {
+            if (profileError.message.includes('users_email_key')) {
+              return { error: { message: 'Email is already registered' }, user: null };
+            }
+            if (profileError.message.includes('users_username_key')) {
+              return { error: { message: 'Username is already taken' }, user: null };
+            }
           }
-          if (profileError.message?.includes('users_username_key')) {
-            return { error: { message: 'Username is already taken' }, user: null };
-          }
+          return { error: profileError, user: null };
         }
-        return { error: profileError, user: null };
-      }
 
-      return { error: null, user: data.user };
-      
+        // Create storage bucket for user if it doesn't exist
+        const { error: storageError } = await supabase
+          .storage
+          .createBucket(`user-${authData.user.id}`, {
+            public: false,
+            allowedMimeTypes: ['image/*'],
+            fileSizeLimit: 5242880 // 5MB
+          });
+
+        if (storageError && !storageError.message.includes('already exists')) {
+          console.error('Error creating user storage bucket:', storageError);
+        }
+
+        return { error: null, user: authData.user };
+      } catch (error: any) {
+        // Clean up auth user if profile creation fails
+        await supabase.auth.admin.deleteUser(authData.user.id);
+        throw error;
+      }
     } catch (error: any) {
       console.error('Signup error:', error);
-      return { error: { message: error.message || 'An unexpected error occurred' }, user: null };
+      return { 
+        error: { 
+          message: error.message?.includes('duplicate key') 
+            ? 'Username or email already exists' 
+            : error.message || 'An unexpected error occurred'
+        }, 
+        user: null 
+      };
     }
   };
 

@@ -311,7 +311,10 @@ DROP POLICY IF EXISTS "Anyone can view experience images" ON storage.objects;
 DROP POLICY IF EXISTS "Anyone can upload experience images" ON storage.objects;
 DROP POLICY IF EXISTS "Anyone can delete own experience images" ON storage.objects;
 
--- Create buckets for file storage
+-- Enable RLS on storage.objects
+ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;
+
+-- Create buckets for file storage if they don't exist
 DO $$
 BEGIN
     INSERT INTO storage.buckets (id, name, public)
@@ -328,47 +331,26 @@ BEGIN
 END $$;
 
 -- Set up storage policies with proper bucket checks
-CREATE POLICY "Anyone can view profile images"
+CREATE POLICY "Public Access"
     ON storage.objects FOR SELECT
-    TO authenticated
-    USING (bucket_id = 'profile-images');
+    TO public
+    USING (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
 
-CREATE POLICY "Anyone can upload profile images"
+CREATE POLICY "Authenticated users can upload images"
     ON storage.objects FOR INSERT
     TO authenticated
-    WITH CHECK (bucket_id = 'profile-images');
+    WITH CHECK (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
 
-CREATE POLICY "Anyone can view trip images"
-    ON storage.objects FOR SELECT
+CREATE POLICY "Users can update their own images"
+    ON storage.objects FOR UPDATE
     TO authenticated
-    USING (bucket_id = 'trip-images');
+    USING (auth.uid()::text = owner);
 
-CREATE POLICY "Anyone can upload trip images"
-    ON storage.objects FOR INSERT
-    TO authenticated
-    WITH CHECK (bucket_id = 'trip-images');
-
-CREATE POLICY "Anyone can delete own profile images"
+CREATE POLICY "Users can delete their own images"
     ON storage.objects FOR DELETE
     TO authenticated
-    USING (bucket_id = 'profile-images' AND (auth.uid() = owner));
+    USING (auth.uid()::text = owner);
 
-CREATE POLICY "Anyone can delete own trip images"
-    ON storage.objects FOR DELETE
-    TO authenticated
-    USING (bucket_id = 'trip-images' AND (auth.uid() = owner));
-
-CREATE POLICY "Anyone can view experience images"
-    ON storage.objects FOR SELECT
-    TO authenticated
-    USING (bucket_id = 'experience-images');
-
-CREATE POLICY "Anyone can upload experience images"
-    ON storage.objects FOR INSERT
-    TO authenticated
-    WITH CHECK (bucket_id = 'experience-images');
-
-CREATE POLICY "Anyone can delete own experience images"
-    ON storage.objects FOR DELETE
-    TO authenticated
-    USING (bucket_id = 'experience-images' AND (auth.uid() = owner)); 
+-- Grant necessary permissions
+GRANT ALL ON storage.objects TO authenticated;
+GRANT ALL ON storage.buckets TO authenticated; 
