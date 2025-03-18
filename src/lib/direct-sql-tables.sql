@@ -307,6 +307,9 @@ DROP POLICY IF EXISTS "Anyone can view trip images" ON storage.objects;
 DROP POLICY IF EXISTS "Anyone can upload trip images" ON storage.objects;
 DROP POLICY IF EXISTS "Anyone can delete own profile images" ON storage.objects;
 DROP POLICY IF EXISTS "Anyone can delete own trip images" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can view experience images" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can upload experience images" ON storage.objects;
+DROP POLICY IF EXISTS "Anyone can delete own experience images" ON storage.objects;
 
 -- Create buckets for file storage
 DO $$
@@ -317,6 +320,10 @@ BEGIN
 
     INSERT INTO storage.buckets (id, name, public)
     VALUES ('trip-images', 'trip-images', true)
+    ON CONFLICT (id) DO NOTHING;
+
+    INSERT INTO storage.buckets (id, name, public)
+    VALUES ('experience-images', 'experience-images', true)
     ON CONFLICT (id) DO NOTHING;
 END $$;
 
@@ -349,4 +356,19 @@ CREATE POLICY "Anyone can delete own profile images"
 CREATE POLICY "Anyone can delete own trip images"
     ON storage.objects FOR DELETE
     TO authenticated
-    USING (bucket_id = 'trip-images' AND (auth.uid() = owner)); 
+    USING (bucket_id = 'trip-images' AND (auth.uid() = owner));
+
+CREATE POLICY "Anyone can view experience images"
+    ON storage.objects FOR SELECT
+    TO authenticated
+    USING (bucket_id = 'experience-images');
+
+CREATE POLICY "Anyone can upload experience images"
+    ON storage.objects FOR INSERT
+    TO authenticated
+    WITH CHECK (bucket_id = 'experience-images');
+
+CREATE POLICY "Anyone can delete own experience images"
+    ON storage.objects FOR DELETE
+    TO authenticated
+    USING (bucket_id = 'experience-images' AND (auth.uid() = owner)); 

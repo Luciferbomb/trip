@@ -87,11 +87,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('users')
         .select('id')
         .eq('email', email)
-        .single();
-        
+        .maybeSingle();
+      
       if (existingEmailUser) {
         return { 
-          error: new Error('Email is already registered'), 
+          error: { message: 'Email is already registered' }, 
           user: null 
         };
       }
@@ -101,17 +101,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .from('users')
         .select('id')
         .eq('username', userData.username)
-        .single();
-        
+        .maybeSingle();
+      
       if (existingUsernameUser) {
         return { 
-          error: new Error('Username is already taken'), 
+          error: { message: 'Username is already taken' }, 
           user: null 
         };
       }
       
       // Create the user in Supabase Auth
-      const { data, error } = await supabase.auth.signUp({
+      const { data, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
@@ -122,25 +122,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         },
       });
       
-      if (error) {
-        return { error, user: null };
+      if (authError) {
+        return { error: authError, user: null };
       }
       
       if (!data.user) {
-        return { error: new Error('No user data returned from auth signup'), user: null };
+        return { error: { message: 'No user data returned from auth signup' }, user: null };
       }
 
-      // Check if user profile already exists
-      const { data: existingProfile } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', data.user.id)
-        .single();
-        
-      if (existingProfile) {
-        // Profile already exists, just return the user
-        return { error: null, user: data.user };
-      }
+      // Wait a short time to ensure auth user is fully created
+      await new Promise(resolve => setTimeout(resolve, 1000));
 
       // Create user profile
       const { error: profileError } = await supabase
@@ -159,31 +150,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
 
       if (profileError) {
-        // If profile creation fails, clean up the auth user
+        // If profile creation fails, delete the auth user
         await supabase.auth.admin.deleteUser(data.user.id);
+        
+        if (profileError.code === '23505') {
+          if (profileError.message?.includes('users_email_key')) {
+            return { error: { message: 'Email is already registered' }, user: null };
+          }
+          if (profileError.message?.includes('users_username_key')) {
+            return { error: { message: 'Username is already taken' }, user: null };
+          }
+        }
         return { error: profileError, user: null };
       }
 
-      // Create initial notification
-      await supabase
-        .from('notifications')
-        .insert({
-          user_id: data.user.id,
-          type: 'welcome',
-          message: 'Welcome to Hireyth! Complete your profile to get started.',
-          created_at: new Date().toISOString()
-        })
-        .then(({ error }) => {
-          if (error) {
-            console.error('Error creating welcome notification:', error);
-            // Don't fail the signup for notification error
-          }
-        });
-
       return { error: null, user: data.user };
       
-    } catch (error) {
-      return { error, user: null };
+    } catch (error: any) {
+      console.error('Signup error:', error);
+      return { error: { message: error.message || 'An unexpected error occurred' }, user: null };
     }
   };
 
