@@ -317,6 +317,10 @@ BEGIN
     DROP POLICY IF EXISTS "Anyone can view experience images" ON storage.objects;
     DROP POLICY IF EXISTS "Anyone can upload experience images" ON storage.objects;
     DROP POLICY IF EXISTS "Anyone can delete own experience images" ON storage.objects;
+    DROP POLICY IF EXISTS "storage_public_access" ON storage.objects;
+    DROP POLICY IF EXISTS "storage_auth_upload" ON storage.objects;
+    DROP POLICY IF EXISTS "storage_auth_update" ON storage.objects;
+    DROP POLICY IF EXISTS "storage_auth_delete" ON storage.objects;
 END $$;
 
 -- Enable RLS on storage.objects
@@ -351,19 +355,22 @@ BEGIN
     CREATE POLICY "storage_auth_upload"
         ON storage.objects FOR INSERT
         TO authenticated
-        WITH CHECK (bucket_id IN ('profile-images', 'trip-images', 'experience-images'));
+        WITH CHECK (
+            bucket_id IN ('profile-images', 'trip-images', 'experience-images') AND
+            (auth.uid() = owner::uuid)
+        );
 
     -- Create policy for users to update their own images
     CREATE POLICY "storage_auth_update"
         ON storage.objects FOR UPDATE
         TO authenticated
-        USING (auth.uid()::text = owner);
+        USING (owner::uuid = auth.uid());
 
     -- Create policy for users to delete their own images
     CREATE POLICY "storage_auth_delete"
         ON storage.objects FOR DELETE
         TO authenticated
-        USING (auth.uid()::text = owner);
+        USING (owner::uuid = auth.uid());
 END $$;
 
 -- Grant necessary permissions
