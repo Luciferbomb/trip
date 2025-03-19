@@ -7,7 +7,7 @@ import { Label } from '../components/ui/label';
 import { Textarea } from '../components/ui/textarea';
 import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { useToast } from '../components/ui/use-toast';
-import { supabase, supabaseAdmin } from '../lib/supabase';
+import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import AppHeader from '../components/AppHeader';
 
@@ -47,10 +47,15 @@ const Onboarding = () => {
   // Fetch user data if available
   useEffect(() => {
     const fetchUserData = async () => {
-      if (!user) return;
+      if (!user) {
+        navigate('/login');
+        return;
+      }
       
       try {
-        // First check if user profile exists
+        setLoading(true);
+        
+        // Fetch user profile
         const { data: userData, error: userError } = await supabase
           .from('users')
           .select('*')
@@ -58,39 +63,55 @@ const Onboarding = () => {
           .single();
         
         if (userError) {
+          // Handle case where user doesn't exist yet in the database
           if (userError.code === 'PGRST116') {
-            console.log('User profile not found, creating one...');
-            // Create user profile if it doesn't exist
-            const { error: createError } = await supabase
+            console.log('User profile not found, creating default profile...');
+            
+            // Pre-populate with data from auth
+            const defaultName = user.user_metadata?.name || user.email?.split('@')[0] || '';
+            const defaultUsername = user.user_metadata?.username || `user${Math.floor(Math.random() * 10000)}`;
+            
+            setProfileData({
+              ...profileData,
+              name: defaultName,
+              username: defaultUsername,
+              profileImage: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80'
+            });
+            
+            // Create a basic profile so we have something to work with
+            await supabase
               .from('users')
               .insert({
                 id: user.id,
-                name: user.user_metadata?.name || '',
+                name: defaultName,
+                username: defaultUsername,
                 email: user.email,
-                profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80'
-              });
+                profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
+                onboarding_completed: false
+              })
+              .select();
               
-            if (createError) {
-              console.error('Error creating user profile:', createError);
-              toast({
-                title: 'Error',
-                description: 'Failed to create user profile. Please try again.',
-                variant: 'destructive'
-              });
-              return;
-            }
           } else {
             console.error('Error fetching user data:', userError);
             toast({
               title: 'Error',
-              description: 'Failed to load user data. Please try again.',
+              description: 'Failed to load your profile data. Please try again.',
               variant: 'destructive'
             });
+          }
+        } else if (userData) {
+          // Check if user has already completed onboarding
+          if (userData.onboarding_completed) {
+            toast({
+              title: 'Welcome back!',
+              description: 'You have already completed onboarding.',
+            });
+            // Redirect to trips page if onboarding is already done
+            navigate('/trips');
             return;
           }
-        }
-
-        if (userData) {
+          
+          // Pre-populate form with existing data
           setProfileData({
             name: userData.name || '',
             username: userData.username || '',
@@ -108,20 +129,20 @@ const Onboarding = () => {
             }
           });
           
-          // Check which steps are already completed
+          // Check which steps are already filled
           const steps = { ...completedSteps };
           
           // Step 1: Basic info
-          if (userData.name && userData.username && userData.location && userData.gender && userData.bio) {
+          if (userData.name && userData.username) {
             steps[1] = true;
           }
           
           // Step 2: Profile picture
-          if (userData.profile_image) {
+          if (userData.profile_image && userData.profile_image !== 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80') {
             steps[2] = true;
           }
           
-          // Step 3: Social media
+          // Step 3: Social media (optional)
           if (userData.instagram || userData.linkedin) {
             steps[3] = true;
           }
@@ -129,161 +150,35 @@ const Onboarding = () => {
           setCompletedSteps(steps);
         }
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Error fetching user data:', error);
         toast({
           title: 'Error',
           description: 'An unexpected error occurred. Please try again.',
           variant: 'destructive'
         });
+      } finally {
+        setLoading(false);
       }
     };
     
     fetchUserData();
-  }, [user]);
-
-  // Add this after the useEffect hook
-  useEffect(() => {
-    // Check available buckets
-    const checkBuckets = async () => {
-      try {
-        const { data: buckets, error } = await supabase.storage.listBuckets();
-        if (error) {
-          console.error('Error listing buckets:', error);
-          return;
-        }
-        console.log('Available buckets:', buckets?.map(b => b.name));
-      } catch (err) {
-        console.error('Error checking buckets:', err);
-      }
-    };
-    
-    checkBuckets();
-  }, []);
-
-  // Replace the createBucketIfNotExists function with this simpler version
-  const checkBucketAccess = async (bucketName: string) => {
-    try {
-      console.log(`Checking access to bucket ${bucketName}...`);
-      const { data: buckets, error: listError } = await supabase.storage.listBuckets();
-      
-      if (listError) {
-        console.error('Error listing buckets:', listError);
-        return false;
-      }
-      
-      const bucketExists = buckets?.some(bucket => bucket.name === bucketName);
-      console.log(`Bucket ${bucketName} exists: ${bucketExists}`);
-      
-      if (bucketExists) {
-        // Try to list files in the bucket to verify access
-        const { data: files, error: filesError } = await supabase.storage
-          .from(bucketName)
-          .list();
-          
-        if (filesError) {
-          console.error(`Error accessing bucket ${bucketName}:`, filesError);
-          return false;
-        }
-        
-        console.log(`Successfully accessed bucket ${bucketName}`);
-        return true;
-      }
-      
-      return false;
-    } catch (error) {
-      console.error('Error checking bucket access:', error);
-      return false;
-    }
-  };
-
-  // Update the useEffect that sets up buckets
-  useEffect(() => {
-    const checkStorage = async () => {
-      // Define fallback buckets in order of preference
-      const buckets = ['public', 'images', 'uploads', 'media'];
-      
-      for (const bucket of buckets) {
-        const hasAccess = await checkBucketAccess(bucket);
-        if (hasAccess) {
-          console.log(`Will use bucket: ${bucket}`);
-          return bucket;
-        }
-      }
-      
-      console.error('No accessible buckets found');
-      toast({
-        title: 'Storage Error',
-        description: 'Unable to access storage. Please contact support.',
-        variant: 'destructive'
-      });
-    };
-    
-    checkStorage();
-  }, []);
-
-  // Add this after the useEffect hook
-  useEffect(() => {
-    const testStorage = async () => {
-      console.log('Starting detailed storage access test...');
-      
-      try {
-        // Test 1: List buckets
-        console.log('Test 1: Listing buckets...');
-        const { data: buckets, error: bucketsError } = await supabase.storage.listBuckets();
-        if (bucketsError) {
-          console.error('❌ Error listing buckets:', bucketsError);
-        } else {
-          console.log('✅ Successfully listed buckets:', buckets);
-        }
-        
-        // Test 2: Check user-images bucket
-        console.log('\nTest 2: Checking user-images bucket...');
-        const { data: userImages, error: userImagesError } = await supabase.storage
-          .from('user-images')
-          .list();
-        if (userImagesError) {
-          console.error('❌ Error accessing user-images:', userImagesError);
-        } else {
-          console.log('✅ Successfully accessed user-images bucket');
-          console.log('Files in user-images:', userImages);
-        }
-        
-        // Test 3: Check experience-images bucket
-        console.log('\nTest 3: Checking experience-images bucket...');
-        const { data: expImages, error: expImagesError } = await supabase.storage
-          .from('experience-images')
-          .list();
-        if (expImagesError) {
-          console.error('❌ Error accessing experience-images:', expImagesError);
-        } else {
-          console.log('✅ Successfully accessed experience-images bucket');
-          console.log('Files in experience-images:', expImages);
-        }
-        
-        console.log('\nStorage test complete!');
-      } catch (error) {
-        console.error('❌ Unexpected error during storage test:', error);
-      }
-    };
-    
-    testStorage();
-  }, []);
+  }, [user, navigate]);
 
   const handleInputChange = (field: string, value: string) => {
     if (field.includes('.')) {
       const [parent, child] = field.split('.');
-      setProfileData(prev => ({
-        ...prev,
+      setProfileData({
+        ...profileData,
         [parent]: {
-          ...prev[parent as keyof typeof prev] as Record<string, any>,
+          ...profileData[parent as keyof typeof profileData],
           [child]: value
         }
-      }));
+      });
     } else {
-      setProfileData(prev => ({
-        ...prev,
+      setProfileData({
+        ...profileData,
         [field]: value
-      }));
+      });
     }
   };
 
@@ -296,264 +191,106 @@ const Onboarding = () => {
   const handleProfileImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file || !user) return;
-
+    
     try {
       setUploadingImage(true);
       
-      // Validate file size
-      if (file.size > 2 * 1024 * 1024) { // 2MB limit
-        throw new Error('File size exceeds 2MB limit');
-      }
-      
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        throw new Error('Invalid file type. Please upload a JPEG, PNG, GIF, or WebP image');
-      }
+      // Use profile-images bucket if available, otherwise fallback
+      let bucketName = 'profile-images';
       
       // Create a unique file name
       const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `profile-images/${fileName}`;
+      const fileName = `${user.id}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+      const filePath = `${fileName}`;
       
-      // Try to upload to the user-images bucket
-      let uploadResult = await supabase.storage
-        .from('user-images')
-        .upload(filePath, file);
-      
-      // If the first upload fails, try creating the bucket and uploading again
-      if (uploadResult.error) {
-        console.error('Upload error details:', uploadResult.error);
+      // Upload the file
+      const { error: uploadError, data } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+          upsert: true,
+          contentType: file.type
+        });
         
-        // Check if the error is due to bucket not existing
-        if (uploadResult.error.message.includes('bucket') || uploadResult.error.message.includes('not found')) {
-          console.log('Bucket might not exist, trying to create it');
-          
-          // Try to create the bucket
-          const { error: createError } = await supabase.storage.createBucket('user-images', {
-            public: true,
-            fileSizeLimit: 1024 * 1024 * 2, // 2MB
-            allowedMimeTypes: ['image/png', 'image/jpeg', 'image/gif', 'image/webp']
-          });
-          
-          if (createError) {
-            console.error('Error creating bucket:', createError);
-          } else {
-            console.log('Bucket created, trying upload again');
-            
-            // Try upload again
-            uploadResult = await supabase.storage
-              .from('user-images')
-              .upload(filePath, file);
-          }
-        }
-        
-        // If still error, try uploading to a different bucket as fallback
-        if (uploadResult.error) {
-          console.log('Trying fallback upload to public bucket');
-          uploadResult = await supabase.storage
-            .from('public')
-            .upload(`profile-images/${fileName}`, file);
-            
-          if (uploadResult.error) {
-            console.error('Fallback upload failed:', uploadResult.error);
-            throw new Error('Failed to upload image after multiple attempts');
-          }
-        }
+      if (uploadError) {
+        throw uploadError;
       }
       
-      // Get the public URL from the appropriate bucket
-      const bucketName = uploadResult.error ? 'public' : 'user-images';
-      const { data } = supabase.storage
+      // Get the public URL
+      const { data: urlData } = supabase.storage
         .from(bucketName)
-        .getPublicUrl(`profile-images/${fileName}`);
+        .getPublicUrl(filePath);
         
-      const publicUrl = data.publicUrl;
+      const publicUrl = urlData.publicUrl;
       
-      // Update profile data
-      setProfileData(prev => ({
-        ...prev,
+      // Update the profile data
+      setProfileData({
+        ...profileData,
         profileImage: publicUrl
-      }));
+      });
       
-      // Mark step as completed
-      setCompletedSteps(prev => ({
-        ...prev,
+      // Update the completed steps
+      setCompletedSteps({
+        ...completedSteps,
         2: true
-      }));
+      });
       
       toast({
         title: 'Success',
-        description: 'Profile picture uploaded successfully!'
+        description: 'Profile picture uploaded successfully!',
       });
-    } catch (error) {
-      console.error('Error uploading image:', error);
+      
+    } catch (error: any) {
+      console.error('Error uploading profile image:', error);
       toast({
-        title: 'Error',
-        description: error instanceof Error ? error.message : 'Failed to upload profile picture. Please try again.',
+        title: 'Upload Failed',
+        description: error.message || 'Failed to upload profile picture. Please try again.',
         variant: 'destructive'
       });
     } finally {
       setUploadingImage(false);
-      // Clear the file input
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  // Update the handleExperienceImageChange function to use the experience-images bucket directly instead of trying multiple buckets
-  const handleExperienceImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file || !user) return;
-
-    try {
-      setLoading(true);
-      console.log('Starting experience image upload process...');
-      
-      // Validate file size (5MB limit)
-      if (file.size > 5 * 1024 * 1024) {
-        throw new Error('File size must be less than 5MB');
-      }
-      
-      // Validate file type
-      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
-      if (!validTypes.includes(file.type)) {
-        throw new Error('Please upload a JPEG, PNG, GIF, or WebP image');
-      }
-      
-      // Create a unique file name
-      const fileExt = file.name.split('.').pop();
-      const fileName = `experience-${user.id}-${Date.now()}.${fileExt}`;
-      const filePath = `experiences/${fileName}`;
-      
-      console.log('Attempting to upload to experience-images bucket...');
-      console.log('File details:', {
-        name: fileName,
-        path: filePath,
-        size: file.size,
-        type: file.type
-      });
-      
-      // Upload directly to experience-images bucket
-      const { error: uploadError } = await supabase.storage
-        .from('experience-images')
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: true
-        });
-        
-      if (uploadError) {
-        console.error('Upload error details:', uploadError);
-        
-        // Check specific error types
-        if (uploadError.message.includes('Permission denied')) {
-          throw new Error('Permission denied. Please check if you are logged in.');
-        } else if (uploadError.message.includes('Bucket not found')) {
-          throw new Error('Storage bucket not found. Please contact support.');
-        } else {
-          throw new Error(`Upload failed: ${uploadError.message}`);
-        }
-      }
-      
-      console.log('Upload successful, getting public URL...');
-      
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('experience-images')
-        .getPublicUrl(filePath);
-      
-      console.log('Public URL generated:', publicUrl);
-      
-      // Update profile data
-      setProfileData(prev => ({
-        ...prev,
-        experience: {
-          ...prev.experience,
-          image: publicUrl
-        }
-      }));
-      
-      toast({
-        title: 'Success',
-        description: 'Experience image uploaded successfully!'
-      });
-      
-    } catch (error: any) {
-      console.error('Error uploading image:', error);
-      toast({
-        title: 'Error',
-        description: error.message || 'Failed to upload image. Please try again.',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoading(false);
-      if (e.target) {
-        e.target.value = ''; // Reset file input
-      }
     }
   };
 
   const validateCurrentStep = () => {
     switch (currentStep) {
       case 1: // Basic info
-        if (!profileData.name || !profileData.username || !profileData.location || !profileData.gender || !profileData.bio) {
+        if (!profileData.name.trim()) {
           toast({
-            title: 'Missing Information',
-            description: 'Please fill in all required fields.',
+            title: 'Required Field',
+            description: 'Please enter your name',
             variant: 'destructive'
           });
           return false;
         }
         
-        // Check username format
-        const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+        if (!profileData.username.trim()) {
+          toast({
+            title: 'Required Field',
+            description: 'Please choose a username',
+            variant: 'destructive'
+          });
+          return false;
+        }
+        
+        const usernameRegex = /^[a-z0-9_]{3,20}$/;
         if (!usernameRegex.test(profileData.username)) {
           toast({
             title: 'Invalid Username',
-            description: 'Username must be 3-20 characters long and can only contain letters, numbers, and underscores.',
+            description: 'Username must be 3-20 characters and can only contain lowercase letters, numbers, and underscores',
             variant: 'destructive'
           });
           return false;
         }
         
-        setCompletedSteps(prev => ({ ...prev, 1: true }));
         return true;
         
-      case 2: // Profile picture
-        if (!profileData.profileImage) {
-          toast({
-            title: 'Missing Profile Picture',
-            description: 'Please upload a profile picture.',
-            variant: 'destructive'
-          });
-          return false;
-        }
-        setCompletedSteps(prev => ({ ...prev, 2: true }));
+      case 2: // Profile picture - optional but encouraged
         return true;
         
-      case 3: // Social media
-        if (!profileData.instagram && !profileData.linkedin) {
-          toast({
-            title: 'Missing Social Media',
-            description: 'Please add at least one social media handle.',
-            variant: 'destructive'
-          });
-          return false;
-        }
-        setCompletedSteps(prev => ({ ...prev, 3: true }));
+      case 3: // Social media - optional
         return true;
         
-      case 4: // Experience
-        if (!profileData.experience.title || !profileData.experience.description || !profileData.experience.location || !profileData.experience.image) {
-          toast({
-            title: 'Missing Experience Details',
-            description: 'Please fill in all experience fields and upload an image.',
-            variant: 'destructive'
-          });
-          return false;
-        }
-        setCompletedSteps(prev => ({ ...prev, 4: true }));
+      case 4: // Experience - can skip
         return true;
         
       default:
@@ -563,18 +300,28 @@ const Onboarding = () => {
 
   const handleNext = () => {
     if (validateCurrentStep()) {
-      if (currentStep < 4) {
-        setCurrentStep(currentStep + 1);
-      } else {
-        // Final step - save everything and redirect
+      if (currentStep === 4) {
         saveProfileAndContinue();
+      } else {
+        setCompletedSteps({
+          ...completedSteps,
+          [currentStep]: true
+        });
+        setCurrentStep(currentStep + 1);
       }
     }
   };
 
   const handlePrevious = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
+    setCurrentStep(currentStep - 1);
+  };
+
+  const handleSkip = () => {
+    // Skip current step if allowed
+    if (currentStep === 4) {
+      saveProfileAndContinue();
+    } else {
+      setCurrentStep(currentStep + 1);
     }
   };
 
@@ -584,112 +331,62 @@ const Onboarding = () => {
     try {
       setLoading(true);
       
-      console.log('Starting profile save process...');
-      console.log('User ID:', user.id);
+      // Prepare data for update
+      const updateData = {
+        name: profileData.name,
+        username: profileData.username,
+        location: profileData.location || null,
+        gender: profileData.gender || null,
+        bio: profileData.bio || null,
+        profile_image: profileData.profileImage,
+        instagram: profileData.instagram || null,
+        linkedin: profileData.linkedin || null,
+        onboarding_completed: true,
+        updated_at: new Date().toISOString()
+      };
       
-      // Check if username is available
-      const { data: existingUser, error: usernameError } = await supabase
+      // Update user profile
+      const { error: updateError } = await supabase
         .from('users')
-        .select('id')
-        .eq('username', profileData.username)
-        .single();
+        .update(updateData)
+        .eq('id', user.id);
         
-      if (existingUser) {
-        toast({
-          title: 'Username Taken',
-          description: 'This username is already taken. Please choose another one.',
-          variant: 'destructive'
-        });
-        setLoading(false);
-        return;
+      if (updateError) {
+        throw updateError;
       }
       
-      // First, check if user profile exists
-      const { data: existingProfile, error: checkError } = await supabase
-        .from('users')
-        .select('id')
-        .eq('id', user.id)
-        .single();
+      // Only add experience if all required fields are filled
+      if (profileData.experience.title && 
+          profileData.experience.description && 
+          profileData.experience.location) {
         
-      if (checkError) {
-        console.log('User profile does not exist, creating one...');
-        // Create the user profile first
-        const { error: createError } = await supabase
-          .from('users')
+        // Add experience
+        const { error: experienceError } = await supabase
+          .from('experiences')
           .insert({
-            id: user.id,
-            username: profileData.username,
-            name: profileData.name,
-            location: profileData.location,
-            gender: profileData.gender,
-            bio: profileData.bio,
-            profile_image: profileData.profileImage,
-            instagram: profileData.instagram,
-            linkedin: profileData.linkedin,
-            onboarding_completed: true,
-            followers_count: 0,
-            following_count: 0,
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString()
+            user_id: user.id,
+            title: profileData.experience.title,
+            description: profileData.experience.description,
+            location: profileData.experience.location,
+            image_url: profileData.experience.image || null,
+            created_at: new Date().toISOString()
           });
           
-        if (createError) {
-          console.error('Error creating user profile:', createError);
-          throw createError;
-        }
-      } else {
-        console.log('User profile exists, updating...');
-        // Update existing profile
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({
-            username: profileData.username,
-            name: profileData.name,
-            location: profileData.location,
-            gender: profileData.gender,
-            bio: profileData.bio,
-            profile_image: profileData.profileImage,
-            instagram: profileData.instagram,
-            linkedin: profileData.linkedin,
-            onboarding_completed: true,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
-          
-        if (updateError) {
-          console.error('Error updating user profile:', updateError);
-          throw updateError;
+        if (experienceError) {
+          console.error('Error adding experience:', experienceError);
+          // Continue anyway since the profile was updated successfully
         }
       }
       
-      console.log('Profile saved successfully, creating experience...');
-      
-      // Then, create the experience
-      const { error: experienceError } = await supabase
-        .from('experiences')
-        .insert({
-          user_id: user.id,
-          title: profileData.experience.title,
-          description: profileData.experience.description,
-          location: profileData.experience.location,
-          image_url: profileData.experience.image,
-          created_at: new Date().toISOString()
-        });
-        
-      if (experienceError) {
-        console.error('Error creating experience:', experienceError);
-        throw experienceError;
-      }
-      
-      console.log('Experience created successfully!');
-      
+      // All done!
       toast({
-        title: 'Profile Completed',
-        description: 'Your profile has been set up successfully!'
+        title: 'Setup Complete!',
+        description: 'Your profile has been set up successfully.',
       });
       
       // Redirect to trips page
       navigate('/trips');
+      
     } catch (error: any) {
       console.error('Error saving profile:', error);
       toast({
@@ -953,7 +650,7 @@ const Onboarding = () => {
                 <input
                   id="exp-image-input"
                   type="file"
-                  onChange={handleExperienceImageChange}
+                  onChange={(e) => handleInputChange('experience.image', e.target.files?.[0]?.name || '')}
                   accept="image/*"
                   className="hidden"
                 />
