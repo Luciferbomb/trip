@@ -550,72 +550,66 @@ export const addOnboardingCompletedField = async (): Promise<boolean> => {
 export const runMigrations = async (insertSamples: boolean = true): Promise<boolean> => {
   console.log('Running database migrations...');
   
-  // Create tables
-  const tripsExists = await checkTableExists('trips');
-  if (!tripsExists) {
-    const tripsSuccess = await createTripsTable();
-    if (!tripsSuccess) {
-      console.error('Failed to create trips table');
-      return false;
-    }
-  }
-  
-  const usersExists = await checkTableExists('users');
-  if (!usersExists) {
-    const usersSuccess = await createUsersTable();
-    if (!usersSuccess) {
-      console.error('Failed to create users table');
-      return false;
-    }
-  }
-  
-  const notificationsExists = await checkTableExists('notifications');
-  if (!notificationsExists) {
-    const notificationsSuccess = await createNotificationsTable();
-    if (!notificationsSuccess) {
-      console.error('Failed to create notifications table');
-      return false;
-    }
-  }
-  
-  const participantsExists = await checkTableExists('trip_participants');
-  if (!participantsExists) {
-    const participantsSuccess = await createTripParticipantsTable();
-    if (!participantsSuccess) {
-      console.error('Failed to create trip_participants table');
-      return false;
-    }
-  }
-  
-  const userFollowsExists = await checkTableExists('user_follows');
-  if (!userFollowsExists) {
-    const userFollowsSuccess = await createUserFollowsTable();
-    if (!userFollowsSuccess) {
-      console.error('Failed to create user_follows table');
-      return false;
-    }
-  }
-  
-  // Add new fields
-  const onboardingFieldSuccess = await addOnboardingCompletedField();
-  
-  // Insert sample data if requested
-  if (insertSamples) {
-    const usersSuccess = await insertSampleUsers();
-    if (!usersSuccess) {
-      console.warn('Failed to insert sample users');
-      // Continue anyway
+  try {
+    // Create tables if they don't exist
+    await createUsersTable();
+    await createTripsTable();
+    await createNotificationsTable();
+    await createTripParticipantsTable();
+    await createExperiencesTable();
+    await createUserFollowsTable();
+    await createExperienceLikesTable();
+    await createExperienceCommentsTable();
+    
+    // Insert sample data in development mode
+    if (insertSamples && import.meta.env.DEV) {
+      await insertSampleUsers();
+      await insertSampleTrips();
     }
     
-    const tripsSuccess = await insertSampleTrips();
-    if (!tripsSuccess) {
-      console.warn('Failed to insert sample trips');
-      // Continue anyway
-    }
+    // Make sure onboarding_completed field exists
+    await addOnboardingCompletedField();
+    
+    console.log('All migrations completed successfully');
+    return true;
+  } catch (error) {
+    console.error('Migration failed:', error);
+    return false;
   }
-  
-  console.log('Database migrations completed successfully');
-  return true;
+};
+
+export const createExperienceLikesTable = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase.rpc('create_experience_likes_table', {});
+    
+    if (error) {
+      console.error('Error creating experience_likes table:', error);
+      return false;
+    }
+    
+    console.log('Experience likes table created or already exists');
+    return true;
+  } catch (error) {
+    console.error('Error:', error);
+    return false;
+  }
+};
+
+export const createExperienceCommentsTable = async (): Promise<boolean> => {
+  try {
+    const { error } = await supabase.rpc('create_experience_comments_table', {});
+    
+    if (error) {
+      console.error('Error creating experience_comments table:', error);
+      return false;
+    }
+    
+    console.log('Experience comments table created or already exists');
+    return true;
+  } catch (error) {
+    console.error('Error:', error);
+    return false;
+  }
 };
 
 export default runMigrations; 

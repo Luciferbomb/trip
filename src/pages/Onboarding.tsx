@@ -251,6 +251,74 @@ const Onboarding = () => {
     }
   };
 
+  // New function to handle experience image uploads
+  const handleExperienceImageChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !user) return;
+    
+    try {
+      setLoading(true);
+      
+      // Validate file size (5MB limit)
+      if (file.size > 5 * 1024 * 1024) {
+        throw new Error('File size must be less than 5MB');
+      }
+      
+      // Validate file type
+      const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp'];
+      if (!validTypes.includes(file.type)) {
+        throw new Error('Please upload a JPEG, PNG, GIF, or WebP image');
+      }
+      
+      // Use experience-images bucket
+      const bucketName = 'experience-images';
+      
+      // Create a unique file name
+      const fileExt = file.name.split('.').pop();
+      const fileName = `experience-${user.id}-${Date.now()}.${fileExt}`;
+      const filePath = `experiences/${fileName}`;
+      
+      // Upload to experience-images bucket
+      const { error: uploadError } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: true
+        });
+        
+      if (uploadError) throw uploadError;
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+      
+      // Update experience data
+      setProfileData(prev => ({
+        ...prev,
+        experience: {
+          ...prev.experience,
+          image: publicUrl
+        }
+      }));
+      
+      toast({
+        title: 'Success',
+        description: 'Experience image uploaded successfully!'
+      });
+      
+    } catch (error: any) {
+      console.error('Error uploading experience image:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to upload image',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const validateCurrentStep = () => {
     switch (currentStep) {
       case 1: // Basic info
@@ -650,7 +718,7 @@ const Onboarding = () => {
                 <input
                   id="exp-image-input"
                   type="file"
-                  onChange={(e) => handleInputChange('experience.image', e.target.files?.[0]?.name || '')}
+                  onChange={handleExperienceImageChange}
                   accept="image/*"
                   className="hidden"
                 />

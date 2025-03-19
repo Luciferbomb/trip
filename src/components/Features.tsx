@@ -1,61 +1,62 @@
-
 import React from 'react';
-import { Users, Map, MessageCircle, ShieldCheck } from 'lucide-react';
-import { cn } from '@/lib/utils';
-
-const features = [
-  {
-    icon: <Users className="w-6 h-6" />,
-    title: "Connect with Fellow Travelers",
-    description: "Build your profile and connect with like-minded travelers from around the world. Find your perfect travel companion based on shared interests and destinations.",
-    color: "from-blue-500 to-cyan-400"
-  },
-  {
-    icon: <Map className="w-6 h-6" />,
-    title: "Discover & Join Trips",
-    description: "Browse open trips or create your own adventure. Specify destinations, dates, and available spots for others to join your journey.",
-    color: "from-orange-500 to-amber-400"
-  },
-  {
-    icon: <MessageCircle className="w-6 h-6" />,
-    title: "Stay Connected",
-    description: "Chat privately with potential travel partners, ask questions in comments, and coordinate through group chats for each trip.",
-    color: "from-green-500 to-emerald-400"
-  },
-  {
-    icon: <ShieldCheck className="w-6 h-6" />,
-    title: "Verified Profiles",
-    description: "Travel with confidence knowing that all users are verified through social profile linking for enhanced security and trust.",
-    color: "from-purple-500 to-violet-400"
-  }
-];
+import { Users, Map, Sun, Shield, Clock, Heart } from 'lucide-react';
 
 const Features = () => {
+  const features = [
+    {
+      icon: <Users className="h-6 w-6 text-hireyth-main" />,
+      title: "Find Like-minded Travelers",
+      description: "Connect with people who share your travel interests, preferences, and destinations."
+    },
+    {
+      icon: <Map className="h-6 w-6 text-hireyth-main" />,
+      title: "Discover Unique Trips",
+      description: "Browse through hundreds of community-created trips to find your next adventure."
+    },
+    {
+      icon: <Sun className="h-6 w-6 text-hireyth-main" />,
+      title: "Create Unforgettable Experiences",
+      description: "Share your travel moments and create memorable experiences with new friends."
+    },
+    {
+      icon: <Shield className="h-6 w-6 text-hireyth-main" />,
+      title: "Traveler Verification",
+      description: "Our verification process ensures you connect with genuine and trusted travelers."
+    },
+    {
+      icon: <Clock className="h-6 w-6 text-hireyth-main" />,
+      title: "Flexible Planning",
+      description: "Join existing trips or create your own with flexible dates and customizable itineraries."
+    },
+    {
+      icon: <Heart className="h-6 w-6 text-hireyth-main" />,
+      title: "Community Support",
+      description: "Get advice, recommendations, and support from our global community of travelers."
+    }
+  ];
+
   return (
-    <section className="py-24 bg-white">
-      <div className="container mx-auto max-w-7xl px-4">
-        <div className="text-center max-w-3xl mx-auto mb-16">
-          <h2 className="text-3xl md:text-4xl font-bold mb-6 tracking-tight">How Hireyth Works</h2>
-          <p className="text-lg text-gray-600">
-            A simple platform designed to help you connect, explore, and create memorable travel experiences.
+    <section className="py-20 bg-white">
+      <div className="container mx-auto px-4">
+        <div className="text-center mb-16">
+          <h2 className="text-3xl md:text-4xl font-bold mb-4 text-gray-900">
+            Why Choose <span className="text-hireyth-main">Hireyth</span>
+          </h2>
+          <p className="text-lg text-gray-600 max-w-2xl mx-auto">
+            Discover how our platform makes travel more accessible, enjoyable, and memorable through community connection.
           </p>
         </div>
-        
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 lg:gap-12">
+
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
             <div 
-              key={index}
-              className="bg-white rounded-2xl subtle-shadow border border-gray-100 p-8 hover-scale"
+              key={index} 
+              className="bg-white p-6 rounded-xl border border-gray-100 shadow-sm hover:shadow-md transition-shadow duration-300"
             >
-              <div className={cn(
-                "w-14 h-14 rounded-xl mb-6 flex items-center justify-center bg-gradient-to-br",
-                feature.color
-              )}>
-                <div className="text-white">
-                  {feature.icon}
-                </div>
+              <div className="bg-hireyth-lightest-blue w-12 h-12 rounded-lg flex items-center justify-center mb-4">
+                {feature.icon}
               </div>
-              <h3 className="text-xl font-semibold mb-3">{feature.title}</h3>
+              <h3 className="text-xl font-semibold mb-2 text-gray-900">{feature.title}</h3>
               <p className="text-gray-600">{feature.description}</p>
             </div>
           ))}

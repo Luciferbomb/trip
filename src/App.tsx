@@ -29,6 +29,8 @@ import EditTrip from "./pages/EditTrip";
 import Feed from '@/components/Feed';
 import Navbar from '@/components/Navbar';
 import Notifications from '@/components/Notifications';
+import Experiences from './pages/Experiences';
+import BottomNav from '@/components/BottomNav';
 
 // Add the Google Fonts link for Dancing Script font
 // This would typically go in the index.html file, but for now we'll add it here
@@ -156,10 +158,13 @@ const AppHeader = () => {
   const navigate = useNavigate();
 
   return (
-    <header className="bg-white border-b border-gray-200">
+    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
       <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/" className="text-xl font-bold text-hireyth-main">
-          Hireyth
+        <Link to="/" className="flex items-center gap-2">
+          <div className="w-8 h-8 bg-gradient-to-br from-hireyth-main to-hireyth-light rounded-lg flex items-center justify-center">
+            <span className="text-xl font-bold text-white">H</span>
+          </div>
+          <span className="text-lg font-semibold text-gray-900">Hireyth</span>
         </Link>
         {user && (
           <div className="flex items-center space-x-4">
@@ -207,7 +212,7 @@ const AppRoutes = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-gray-50">
       {dbError && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Database Error:</strong>
@@ -237,7 +242,7 @@ const AppRoutes = () => {
           <Route path="/create" element={<ProtectedRoute><CreateTrip /></ProtectedRoute>} />
           <Route path="/trips/:id" element={<ProtectedRoute><TripDetails /></ProtectedRoute>} />
           <Route path="/trips/:id/edit" element={<ProtectedRoute><EditTrip /></ProtectedRoute>} />
-          <Route path="/experiences" element={<ProtectedRoute><div>Experiences Page Coming Soon</div></ProtectedRoute>} />
+          <Route path="/experiences" element={<ProtectedRoute><Experiences /></ProtectedRoute>} />
           <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
           <Route path="/about" element={<About />} />
           <Route path="/terms" element={<Terms />} />
@@ -258,9 +263,11 @@ const AppContent = () => {
     <div className="min-h-screen bg-gray-50">
       <div className="max-w-md mx-auto">
         <AppHeader />
-        <AppRoutes />
+        <div className={user ? 'pb-24' : ''}>
+          <AppRoutes />
+        </div>
       </div>
-      {user && <Navbar />}
+      {user && <BottomNav />}
     </div>
   );
 };

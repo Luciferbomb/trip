@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { Settings, Image, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Settings, Image as ImageIcon, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X, Heart, MessageCircle, Globe, Grid, Bookmark, MapIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BottomNav from '@/components/BottomNav';
@@ -20,6 +20,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import mapboxgl from 'mapbox-gl';
+import 'mapbox-gl/dist/mapbox-gl.css';
 
 interface UserProfile {
   id: string;
@@ -81,6 +83,22 @@ interface Experience {
   image_url: string | null;
   user_id: string;
   created_at: string;
+  likes_count: number;
+  comments_count: number;
+  is_liked?: boolean;
+}
+
+interface Comment {
+  id: string;
+  experience_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user: {
+    name: string;
+    profile_image: string;
+    username: string;
+  };
 }
 
 interface DatabaseFollowerResponse {
@@ -100,6 +118,10 @@ interface DatabaseFollowingResponse {
     profile_image: string;
   };
 }
+
+// Set Mapbox access token
+const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
+mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
 const ProfileComponent: React.FC = () => {
   const { username } = useParams<{ username: string }>();
@@ -125,6 +147,11 @@ const ProfileComponent: React.FC = () => {
   const [following, setFollowing] = useState<Follower[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
+  const [showComments, setShowComments] = useState(false);
+  const [currentExperience, setCurrentExperience] = useState<Experience | null>(null);
+  const [comments, setComments] = useState<Comment[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [commentText, setCommentText] = useState('');
 
   useEffect(() => {
     if (user) {
@@ -261,12 +288,46 @@ const ProfileComponent: React.FC = () => {
       // Fetch experiences
       const { data: experienceData, error: expError } = await supabase
         .from('experiences')
-        .select('*')
+        .select(`
+          *,
+          likes_count:experience_likes(count),
+          comments_count:experience_comments(count)
+        `)
         .eq('user_id', userData.id)
         .order('created_at', { ascending: false });
         
       if (expError) throw expError;
-      setExperiences(experienceData || []);
+      
+      // Check if the current user has liked any of these experiences
+      let processedExperiences = experienceData || [];
+      
+      if (user) {
+        const { data: userLikes, error: likesError } = await supabase
+          .from('experience_likes')
+          .select('experience_id')
+          .eq('user_id', user.id)
+          .in('experience_id', processedExperiences.map(exp => exp.id));
+          
+        if (!likesError && userLikes) {
+          const likedExperienceIds = new Set(userLikes.map(like => like.experience_id));
+          
+          processedExperiences = processedExperiences.map(exp => ({
+            ...exp,
+            is_liked: likedExperienceIds.has(exp.id),
+            likes_count: exp.likes_count.count || 0,
+            comments_count: exp.comments_count.count || 0
+          }));
+        }
+      } else {
+        processedExperiences = processedExperiences.map(exp => ({
+          ...exp,
+          is_liked: false,
+          likes_count: exp.likes_count.count || 0,
+          comments_count: exp.comments_count.count || 0
+        }));
+      }
+      
+      setExperiences(processedExperiences);
       
       // Fetch created trips
       const { data: createdTripsData, error: createdTripsError } = await supabase
@@ -434,12 +495,46 @@ const ProfileComponent: React.FC = () => {
       // Fetch updated experiences
       const { data: experienceData, error: expError } = await supabase
         .from('experiences')
-        .select('*')
+        .select(`
+          *,
+          likes_count:experience_likes(count),
+          comments_count:experience_comments(count)
+        `)
         .eq('user_id', profileData.id)
         .order('created_at', { ascending: false });
         
       if (expError) throw expError;
-      setExperiences(experienceData || []);
+      
+      // Process the fetched experiences
+      let processedExperiences = experienceData || [];
+      
+      if (user) {
+        const { data: userLikes, error: likesError } = await supabase
+          .from('experience_likes')
+          .select('experience_id')
+          .eq('user_id', user.id)
+          .in('experience_id', processedExperiences.map(exp => exp.id));
+          
+        if (!likesError && userLikes) {
+          const likedExperienceIds = new Set(userLikes.map(like => like.experience_id));
+          
+          processedExperiences = processedExperiences.map(exp => ({
+            ...exp,
+            is_liked: likedExperienceIds.has(exp.id),
+            likes_count: exp.likes_count.count || 0,
+            comments_count: exp.comments_count.count || 0
+          }));
+        }
+      } else {
+        processedExperiences = processedExperiences.map(exp => ({
+          ...exp,
+          is_liked: false,
+          likes_count: exp.likes_count.count || 0,
+          comments_count: exp.comments_count.count || 0
+        }));
+      }
+      
+      setExperiences(processedExperiences);
       
       // Update profile data to reflect new experiences count
       const { data: userData, error: userError } = await supabase
@@ -647,6 +742,66 @@ const ProfileComponent: React.FC = () => {
     }
   };
 
+  const handleLikeExperience = async (experienceId: string, isLiked: boolean) => {
+    if (!user) return;
+    
+    try {
+      if (isLiked) {
+        // Unlike the experience
+        const { error } = await supabase
+          .from('experience_likes')
+          .delete()
+          .eq('experience_id', experienceId)
+          .eq('user_id', user.id);
+          
+        if (error) throw error;
+        
+        // Update local state
+        setExperiences(prev => 
+          prev.map(exp => 
+            exp.id === experienceId 
+              ? { 
+                  ...exp, 
+                  is_liked: false,
+                  likes_count: Math.max(0, exp.likes_count - 1)
+                } 
+              : exp
+          )
+        );
+      } else {
+        // Like the experience
+        const { error } = await supabase
+          .from('experience_likes')
+          .insert({
+            experience_id: experienceId,
+            user_id: user.id
+          });
+          
+        if (error) throw error;
+        
+        // Update local state
+        setExperiences(prev => 
+          prev.map(exp => 
+            exp.id === experienceId 
+              ? { 
+                  ...exp, 
+                  is_liked: true,
+                  likes_count: (exp.likes_count || 0) + 1
+                } 
+              : exp
+          )
+        );
+      }
+    } catch (error) {
+      console.error('Error liking/unliking experience:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to update like status',
+        variant: 'destructive'
+      });
+    }
+  };
+
   const renderTripCard = (trip: Trip) => (
     <div
       key={trip.id}
@@ -767,6 +922,338 @@ const ProfileComponent: React.FC = () => {
     }
   };
 
+  const renderSocialLinks = () => {
+    if (!profileData) return null;
+
+    return (
+      <div className="flex gap-3 mt-3">
+        {profileData.instagram && (
+          <a
+            href={`https://instagram.com/${profileData.instagram}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-pink-600 hover:text-pink-700 flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/>
+            </svg>
+            <span>Instagram</span>
+          </a>
+        )}
+        
+        {profileData.linkedin && (
+          <a
+            href={`https://linkedin.com/in/${profileData.linkedin}`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-blue-600 hover:text-blue-700 flex items-center gap-1.5"
+          >
+            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+              <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452zM22.225 0H1.771C.792 0 0 .774 0 1.729v20.542C0 23.227.792 24 1.771 24h20.451C23.2 24 24 23.227 24 22.271V1.729C24 .774 23.2 0 22.222 0h.003z"/>
+            </svg>
+            <span>LinkedIn</span>
+          </a>
+        )}
+      </div>
+    );
+  };
+
+  // Add a function to render the profile map
+  const ProfileMapBackground = ({ userId }: { userId: string }) => {
+    const mapContainer = useRef<HTMLDivElement>(null);
+    const map = useRef<mapboxgl.Map | null>(null);
+    const [locations, setLocations] = useState<[number, number][]>([]);
+    
+    useEffect(() => {
+      // Fetch locations visited by user
+      const fetchUserLocations = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('experiences')
+            .select('location')
+            .eq('user_id', userId);
+            
+          if (error) throw error;
+          
+          // Sample locations for demonstration
+          const sampleLocationsMap: Record<string, [number, number]> = {
+            'New York': [-74.0060, 40.7128],
+            'Los Angeles': [-118.2437, 34.0522],
+            'London': [-0.1278, 51.5074],
+            'Paris': [2.3522, 48.8566],
+            'Tokyo': [139.6503, 35.6762],
+            'Sydney': [151.2093, -33.8688],
+            'Rio de Janeiro': [-43.1729, -22.9068],
+            'Cape Town': [18.4241, -33.9249],
+            'Mumbai': [72.8777, 19.0760],
+            'Dubai': [55.2708, 25.2048],
+            'Berlin': [13.4050, 52.5200],
+            'Mexico City': [-99.1332, 19.4326],
+            'Singapore': [103.8198, 1.3521],
+            'Barcelona': [2.1734, 41.3851],
+            'Rome': [12.4964, 41.9028],
+            'Amsterdam': [4.9041, 52.3676],
+            'Hong Kong': [114.1694, 22.3193],
+            'Bali': [115.0920, -8.3405],
+            'Santorini': [25.4615, 36.3932],
+            'Kyoto': [135.7681, 35.0116]
+          };
+          
+          // Match experiences to sample locations or generate random ones
+          const coords: [number, number][] = [];
+          
+          if (data && data.length > 0) {
+            data.forEach(exp => {
+              if (exp.location) {
+                // Try to match by name
+                const locationMatch = Object.keys(sampleLocationsMap).find(
+                  loc => exp.location.toLowerCase().includes(loc.toLowerCase())
+                );
+                
+                if (locationMatch) {
+                  coords.push(sampleLocationsMap[locationMatch]);
+                }
+              }
+            });
+          }
+          
+          // If we don't have at least 3 points, add some defaults
+          if (coords.length < 3) {
+            const defaultLocations = Object.values(sampleLocationsMap).slice(0, 5);
+            coords.push(...defaultLocations);
+          }
+          
+          setLocations(coords);
+        } catch (error) {
+          console.error('Error fetching user locations:', error);
+          // Set some default locations
+          setLocations([
+            [-74.0060, 40.7128], // New York
+            [2.3522, 48.8566],   // Paris
+            [139.6503, 35.6762]  // Tokyo
+          ]);
+        }
+      };
+      
+      fetchUserLocations();
+    }, [userId]);
+    
+    useEffect(() => {
+      if (!mapContainer.current || locations.length === 0) return;
+      
+      // Initialize map
+      map.current = new mapboxgl.Map({
+        container: mapContainer.current,
+        style: 'mapbox://styles/mapbox/light-v11',
+        center: locations[0],
+        zoom: 1.8,
+        projection: 'globe',
+        interactive: false, // Disable interaction
+        attributionControl: false,
+        bearing: 30, // Add slight rotation for visual interest
+        pitch: 20  // Add slight tilt for better 3D effect
+      });
+      
+      // Add atmosphere and styling
+      map.current.on('load', () => {
+        if (!map.current) return;
+        
+        // Set atmosphere
+        map.current.setFog({
+          color: 'rgb(186, 228, 255)',
+          'high-color': 'rgb(145, 205, 242)',
+          'horizon-blend': 0.1,
+          'space-color': 'rgb(200, 230, 255)',
+          'star-intensity': 0
+        });
+        
+        // Add source for visited locations
+        map.current.addSource('locations', {
+          type: 'geojson',
+          data: {
+            type: 'FeatureCollection',
+            features: locations.map((coords, i) => ({
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'Point',
+                coordinates: coords
+              }
+            }))
+          }
+        });
+        
+        // Add points
+        map.current.addLayer({
+          id: 'location-points',
+          type: 'circle',
+          source: 'locations',
+          paint: {
+            'circle-radius': 6,
+            'circle-color': '#FF4081',
+            'circle-opacity': 0.8,
+            'circle-stroke-width': 2,
+            'circle-stroke-color': 'white',
+            'circle-stroke-opacity': 0.7
+          }
+        });
+        
+        // Add connections between points if we have multiple
+        if (locations.length > 1) {
+          map.current.addSource('connections', {
+            type: 'geojson',
+            data: {
+              type: 'Feature',
+              properties: {},
+              geometry: {
+                type: 'LineString',
+                coordinates: locations
+              }
+            }
+          });
+          
+          map.current.addLayer({
+            id: 'route',
+            type: 'line',
+            source: 'connections',
+            layout: {
+              'line-join': 'round',
+              'line-cap': 'round'
+            },
+            paint: {
+              'line-color': '#FF4081',
+              'line-width': 2,
+              'line-opacity': 0.6,
+              'line-dasharray': [0, 2, 1]
+            }
+          });
+        }
+        
+        // Add subtle gradient overlay for better text visibility
+        const mapCanvas = map.current.getCanvas();
+        const wrapper = mapCanvas.parentElement;
+        if (wrapper) {
+          const overlay = document.createElement('div');
+          overlay.style.position = 'absolute';
+          overlay.style.top = '0';
+          overlay.style.left = '0';
+          overlay.style.width = '100%';
+          overlay.style.height = '100%';
+          overlay.style.background = 'linear-gradient(0deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%)';
+          overlay.style.pointerEvents = 'none';
+          overlay.style.zIndex = '1';
+          wrapper.appendChild(overlay);
+        }
+        
+        // Auto-rotate camera for visual interest
+        const rotateCamera = () => {
+          if (!map.current) return;
+          map.current.rotateTo((map.current.getBearing() + 0.05) % 360, { 
+            duration: 0,
+            easing: (t) => t
+          });
+          requestAnimationFrame(rotateCamera);
+        };
+        
+        requestAnimationFrame(rotateCamera);
+      });
+      
+      // Clean up
+      return () => {
+        if (map.current) {
+          map.current.remove();
+          map.current = null;
+        }
+      };
+    }, [locations]);
+    
+    return (
+      <div 
+        ref={mapContainer} 
+        className="w-full h-full"
+      />
+    );
+  };
+
+  const fetchComments = async (experienceId: string) => {
+    if (!experienceId) return;
+    
+    try {
+      setLoadingComments(true);
+      
+      const { data, error } = await supabase
+        .from('experience_comments')
+        .select(`
+          *,
+          user:users(name, profile_image, username)
+        `)
+        .eq('experience_id', experienceId)
+        .order('created_at', { ascending: true });
+        
+      if (error) throw error;
+      
+      setComments(data || []);
+    } catch (error) {
+      console.error('Error fetching comments:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to load comments',
+        variant: 'destructive'
+      });
+    } finally {
+      setLoadingComments(false);
+    }
+  };
+  
+  const handleOpenComments = (experience: Experience) => {
+    setCurrentExperience(experience);
+    setShowComments(true);
+    fetchComments(experience.id);
+  };
+  
+  const handleAddComment = async () => {
+    if (!user || !currentExperience || !commentText.trim()) return;
+    
+    try {
+      const { error } = await supabase
+        .from('experience_comments')
+        .insert({
+          experience_id: currentExperience.id,
+          user_id: user.id,
+          content: commentText.trim()
+        });
+        
+      if (error) throw error;
+      
+      // Refresh comments
+      fetchComments(currentExperience.id);
+      
+      // Update comment count in experiences list
+      setExperiences(prev => 
+        prev.map(exp => 
+          exp.id === currentExperience.id 
+            ? { ...exp, comments_count: exp.comments_count + 1 } 
+            : exp
+        )
+      );
+      
+      // Clear comment text
+      setCommentText('');
+      
+      toast({
+        title: 'Success',
+        description: 'Comment added successfully'
+      });
+    } catch (error) {
+      console.error('Error adding comment:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to add comment',
+        variant: 'destructive'
+      });
+    }
+  };
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
@@ -793,29 +1280,143 @@ const ProfileComponent: React.FC = () => {
   const isOwnProfile = user && profileData && user.id === profileData.id;
   
   return (
-    <div className="min-h-screen bg-gray-50 pb-16">
-      <div className="max-w-2xl mx-auto p-4">
+    <div className="min-h-screen bg-gray-50 pb-20">
+      <div className="max-w-4xl mx-auto px-4">
         {/* Profile Header */}
-        <div className="bg-white rounded-lg shadow-sm overflow-hidden">
-          {/* Cover Image */}
-          <div className="h-32 bg-gradient-to-r from-hireyth-main to-hireyth-main/60" />
-          
-          {/* Profile Info */}
-          <div className="p-6 relative">
-            {/* Profile Image */}
-            <div className="absolute -top-16 left-6">
-              <img
-                src={profileData?.profile_image}
-                alt={profileData?.name}
-                className="w-24 h-24 rounded-full object-cover border-4 border-white shadow-md"
-              />
+        <div className="mb-8">
+          <div className="relative mb-20 sm:mb-24">
+            {/* Cover Image with Map Background */}
+            <div className="h-48 sm:h-64 rounded-xl overflow-hidden shadow-sm">
+              {profileData && (
+                <div className="absolute inset-0 w-full h-full">
+                  <ProfileMapBackground userId={profileData.id} />
+                </div>
+              )}
             </div>
             
+            {/* Profile Image */}
+            <div className="absolute -bottom-16 sm:-bottom-20 left-1/2 -translate-x-1/2 shadow-md rounded-full border-4 border-white">
+              <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-white">
+                <img
+                  src={profileData?.profile_image}
+                  alt={profileData?.name}
+                  className="w-full h-full object-cover"
+                  loading="lazy"
+                />
+              </div>
+            </div>
+          </div>
+          
+          {/* User Info */}
+          <div className="text-center mb-6">
+            {isEditMode ? (
+              <Input
+                value={editForm.name || ''}
+                onChange={(e) => handleInputChange('name', e.target.value)}
+                className="font-bold text-xl mb-1 text-center"
+                placeholder="Your name"
+              />
+            ) : (
+              <h1 className="text-2xl font-bold mb-1">{profileData?.name}</h1>
+            )}
+            
+            <p className="text-gray-500 mb-3">@{profileData?.username}</p>
+            
+            <div className="flex justify-center space-x-3 text-sm text-gray-500 mb-4">
+              {isEditMode ? (
+                <Input
+                  value={editForm.location || ''}
+                  onChange={(e) => handleInputChange('location', e.target.value)}
+                  className="mt-2 max-w-xs mx-auto"
+                  placeholder="Add your location"
+                />
+              ) : profileData?.location && (
+                <div className="flex items-center">
+                  <MapPin size={14} className="mr-1" />
+                  <span>{profileData.location}</span>
+                </div>
+              )}
+            </div>
+            
+            {/* Bio */}
+            {isEditMode ? (
+              <Textarea
+                value={editForm.bio || ''}
+                onChange={(e) => handleInputChange('bio', e.target.value)}
+                placeholder="Write something about yourself"
+                className="mt-2 max-w-md mx-auto mb-5"
+              />
+            ) : profileData?.bio && (
+              <p className="max-w-md mx-auto mb-5 text-sm">{profileData.bio}</p>
+            )}
+            
+            {/* Stats */}
+            <div className="flex justify-center space-x-6 mb-6">
+              <div className="text-center">
+                <div className="font-bold">{experiences.length}</div>
+                <div className="text-xs text-gray-500">Experiences</div>
+              </div>
+              <button
+                className="text-center"
+                onClick={() => {
+                  setShowFollowers(true);
+                  fetchFollowers();
+                }}
+              >
+                <div className="font-bold">{profileData?.followers_count ?? 0}</div>
+                <div className="text-xs text-gray-500">Followers</div>
+              </button>
+              <button
+                className="text-center"
+                onClick={() => {
+                  setShowFollowing(true);
+                  fetchFollowing();
+                }}
+              >
+                <div className="font-bold">{profileData?.following_count ?? 0}</div>
+                <div className="text-xs text-gray-500">Following</div>
+              </button>
+            </div>
+            
+            {/* Social Links */}
+            {isEditMode ? (
+              <div className="space-y-2 max-w-md mx-auto mb-6">
+                <div className="flex items-center">
+                  <span className="text-pink-600 w-6 h-6 mr-2">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/>
+                    </svg>
+                  </span>
+                  <Input
+                    value={editForm.instagram || ''}
+                    onChange={(e) => handleInputChange('instagram', e.target.value)}
+                    placeholder="Instagram username (without @)"
+                  />
+                </div>
+                <div className="flex items-center">
+                  <span className="text-blue-600 w-6 h-6 mr-2">
+                    <svg fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452z"/>
+                    </svg>
+                  </span>
+                  <Input
+                    value={editForm.linkedin || ''}
+                    onChange={(e) => handleInputChange('linkedin', e.target.value)}
+                    placeholder="LinkedIn username"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flex justify-center mb-6">
+                {renderSocialLinks()}
+              </div>
+            )}
+            
             {/* Actions */}
-            <div className="flex justify-end mb-12">
+            <div className="flex justify-center space-x-3 mb-8">
               {isOwnProfile ? (
                 <Button
-                  variant="outline"
+                  variant={isEditMode ? "default" : "outline"}
                   size="sm"
                   onClick={() => {
                     if (isEditMode) {
@@ -825,13 +1426,14 @@ const ProfileComponent: React.FC = () => {
                     }
                   }}
                   disabled={isSaving}
+                  className="flex items-center"
                 >
                   {isSaving ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   ) : isEditMode ? (
                     <>
                       <Save className="w-4 h-4 mr-2" />
-                      Save
+                      Save Profile
                     </>
                   ) : (
                     <>
@@ -846,9 +1448,10 @@ const ProfileComponent: React.FC = () => {
                   size="sm"
                   onClick={handleFollow}
                   disabled={followLoading}
+                  className="flex items-center"
                 >
                   {followLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
                   ) : isFollowing ? (
                     <>
                       <UserMinus className="w-4 h-4 mr-2" />
@@ -862,192 +1465,222 @@ const ProfileComponent: React.FC = () => {
                   )}
                 </Button>
               )}
-            </div>
-            
-            {/* User Info */}
-            <div className="space-y-4">
-              <div>
-                {isEditMode ? (
-                  <Input
-                    value={editForm.name || ''}
-                    onChange={(e) => handleInputChange('name', e.target.value)}
-                    className="font-bold text-xl mb-1"
-                    placeholder="Your name"
-                  />
-                ) : (
-                  <h1 className="text-2xl font-bold">{profileData?.name}</h1>
-                )}
-                <p className="text-gray-600">@{profileData?.username}</p>
-              </div>
               
-              {/* Location */}
-              {isEditMode ? (
-                <Input
-                  value={editForm.location || ''}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="mt-2"
-                  placeholder="Add your location"
-                />
-              ) : profileData?.location && (
-                <div className="flex items-center text-gray-600">
-                  <MapPin className="w-4 h-4 mr-1" />
-                  <span>{profileData.location}</span>
-                </div>
-              )}
-              
-              {/* Bio */}
-              {isEditMode ? (
-                <Textarea
-                  value={editForm.bio || ''}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
-                  placeholder="Write something about yourself"
-                  className="mt-2"
-                />
-              ) : profileData?.bio && (
-                <p className="text-gray-700">{profileData.bio}</p>
-              )}
-              
-              {/* Stats */}
-              <div className="flex items-center space-x-6 pt-4 border-t">
-                <button
-                  className="text-center hover:bg-gray-50 px-4 py-2 rounded-md transition-colors"
-                  onClick={() => {
-                    setShowFollowers(true);
-                    fetchFollowers();
-                  }}
+              {isOwnProfile && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={handleLogout}
+                  className="flex items-center"
                 >
-                  <div className="text-xl font-bold">{profileData?.followers_count ?? 0}</div>
-                  <div className="text-sm text-gray-600">Followers</div>
-                </button>
-                
-                <button
-                  className="text-center hover:bg-gray-50 px-4 py-2 rounded-md transition-colors"
-                  onClick={() => {
-                    setShowFollowing(true);
-                    fetchFollowing();
-                  }}
-                >
-                  <div className="text-xl font-bold">{profileData?.following_count ?? 0}</div>
-                  <div className="text-sm text-gray-600">Following</div>
-                </button>
-              </div>
+                  <Settings className="w-4 h-4 mr-2" />
+                  Settings
+                </Button>
+              )}
             </div>
           </div>
         </div>
         
-        {/* Tabs Section */}
-        <Tabs defaultValue="experiences" className="w-full">
-          <TabsList className="grid w-full grid-cols-3">
-            <TabsTrigger value="experiences">
-              Experiences ({experiences.length})
-            </TabsTrigger>
-            <TabsTrigger value="created">
-              Created ({createdTrips.length})
-            </TabsTrigger>
-            <TabsTrigger value="joined">
-              Joined ({joinedTrips.length})
-            </TabsTrigger>
-          </TabsList>
+        {/* Tabs */}
+        <div className="mb-6">
+          <div className="flex justify-center border-b border-gray-200 mb-6">
+            <button
+              className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+                activeTab === 'experiences' 
+                  ? 'border-hireyth-main text-hireyth-main' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('experiences')}
+            >
+              <Grid className="w-4 h-4 mr-2" />
+              <span>Experiences</span>
+            </button>
+            <button
+              className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+                activeTab === 'created' 
+                  ? 'border-hireyth-main text-hireyth-main' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('created')}
+            >
+              <MapIcon className="w-4 h-4 mr-2" />
+              <span>Created</span>
+            </button>
+            <button
+              className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+                activeTab === 'joined' 
+                  ? 'border-hireyth-main text-hireyth-main' 
+                  : 'border-transparent text-gray-500 hover:text-gray-700'
+              }`}
+              onClick={() => setActiveTab('joined')}
+            >
+              <Bookmark className="w-4 h-4 mr-2" />
+              <span>Joined</span>
+            </button>
+          </div>
           
-          <TabsContent value="experiences" className="mt-6">
-            <div className="space-y-6">
-              {isOwnProfile && (
-                <Button
-                  onClick={() => setShowAddExperience(true)}
-                  className="bg-hireyth-main hover:bg-hireyth-main/90"
-                >
-                  Add Experience
-                </Button>
-              )}
-              
-              {experiences.length === 0 ? (
-                <p className="text-center text-gray-600 py-8">
-                  No experiences shared yet
-                </p>
-              ) : (
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                  {experiences.map((exp: Experience) => (
-                    <div key={exp.id} className="bg-white rounded-lg shadow-sm overflow-hidden">
-                      {exp.image_url && (
-                        <img
-                          src={exp.image_url}
-                          alt={exp.title}
-                          className="w-full h-48 object-cover"
-                        />
-                      )}
-                      <div className="p-4">
-                        <div className="flex justify-between items-start">
-                          <div>
-                            <h3 className="font-semibold text-lg">{exp.title}</h3>
-                            <p className="text-gray-600">{exp.location}</p>
+          {/* Tab Content */}
+          <div>
+            {activeTab === 'experiences' && (
+              <div className="space-y-6 relative">
+                {experiences.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">No experiences shared yet</p>
+                    {isOwnProfile && (
+                      <Button
+                        onClick={() => setShowAddExperience(true)}
+                        className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                      >
+                        Add Your First Experience
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div className="space-y-6">
+                      {experiences.map((exp: Experience) => (
+                        <div key={exp.id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow duration-300">
+                          <div className="relative">
+                            {exp.image_url ? (
+                              <img
+                                src={exp.image_url}
+                                alt={exp.title}
+                                className="w-full h-56 object-cover"
+                                onError={(e) => {
+                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80';
+                                }}
+                              />
+                            ) : (
+                              <div className="w-full h-56 bg-gray-100 flex items-center justify-center">
+                                <ImageIcon className="h-12 w-12 text-gray-300" />
+                              </div>
+                            )}
+                            
+                            <Badge className="absolute top-3 right-3 bg-white/80 text-gray-800 hover:bg-white/90">
+                              Travel
+                            </Badge>
+                            
+                            {isOwnProfile && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="absolute top-3 left-3 h-8 w-8 rounded-full bg-white/80 hover:bg-white/90"
+                                onClick={() => handleDeleteExperience(exp.id)}
+                              >
+                                <X className="w-4 h-4" />
+                              </Button>
+                            )}
                           </div>
-                          {isOwnProfile && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleDeleteExperience(exp.id)}
+                          <div className="p-4">
+                            <div>
+                              <h3 className="font-semibold text-lg text-gray-900">{exp.title}</h3>
+                              <p className="text-gray-600 flex items-center mt-1">
+                                <MapPin className="h-4 w-4 mr-1" /> {exp.location}
+                              </p>
+                            </div>
+                            <div 
+                              className="mt-3 text-gray-700 cursor-pointer"
+                              onClick={(e) => {
+                                const target = e.currentTarget;
+                                target.classList.toggle('line-clamp-3');
+                              }}
                             >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
+                              <p className="line-clamp-3">{exp.description}</p>
+                            </div>
+                            <div className="mt-4 flex justify-between items-center">
+                              <div className="flex space-x-2">
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="px-2 h-8 text-gray-600 hover:text-hireyth-orange"
+                                  onClick={() => handleLikeExperience(exp.id, exp.is_liked)}
+                                >
+                                  <Heart className={`w-4 h-4 mr-1 ${exp.is_liked ? 'text-hireyth-orange fill-hireyth-orange' : 'text-gray-500'}`} />
+                                  <span>{exp.likes_count}</span>
+                                </Button>
+                                <Button 
+                                  variant="ghost" 
+                                  size="sm" 
+                                  className="px-2 h-8 text-gray-600 hover:text-hireyth-blue"
+                                  onClick={() => handleOpenComments(exp)}
+                                >
+                                  <MessageCircle className="w-4 h-4 mr-1" />
+                                  <span>{exp.comments_count}</span>
+                                </Button>
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                {new Date(exp.created_at).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric' 
+                                })}
+                              </p>
+                            </div>
+                          </div>
                         </div>
-                        <div 
-                          className="mt-2 text-gray-700 cursor-pointer"
-                          onClick={(e) => {
-                            const target = e.currentTarget;
-                            target.classList.toggle('line-clamp-3');
-                          }}
-                        >
-                          <p className="line-clamp-3">{exp.description}</p>
-                        </div>
-                      </div>
+                      ))}
                     </div>
-                  ))}
-                </div>
-              )}
-            </div>
-          </TabsContent>
-          
-          <TabsContent value="created" className="mt-6">
-            {createdTrips.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No trips created yet</p>
-                {isOwnProfile && (
-                  <Button
-                    onClick={() => navigate('/create')}
-                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
-                  >
-                    Create Your First Trip
-                  </Button>
+                    {isOwnProfile && (
+                      <Button
+                        onClick={() => setShowAddExperience(true)}
+                        className="fixed bottom-24 right-6 h-12 w-12 rounded-full shadow-lg bg-hireyth-main hover:bg-hireyth-main/90 flex items-center justify-center p-0"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-plus">
+                          <path d="M5 12h14" />
+                          <path d="M12 5v14" />
+                        </svg>
+                      </Button>
+                    )}
+                  </>
                 )}
               </div>
-            ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                {createdTrips.map(renderTripCard)}
-              </div>
             )}
-          </TabsContent>
-          
-          <TabsContent value="joined" className="mt-6">
-            {joinedTrips.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No trips joined yet</p>
-                {isOwnProfile && (
-                  <Button
-                    onClick={() => navigate('/trips')}
-                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
-                  >
-                    Explore Trips
-                  </Button>
+            
+            {activeTab === 'created' && (
+              <div>
+                {createdTrips.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">No trips created yet</p>
+                    {isOwnProfile && (
+                      <Button
+                        onClick={() => navigate('/create')}
+                        className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                      >
+                        Create Your First Trip
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {createdTrips.map(renderTripCard)}
+                  </div>
                 )}
               </div>
-            ) : (
-              <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                {joinedTrips.map(renderTripCard)}
+            )}
+            
+            {activeTab === 'joined' && (
+              <div>
+                {joinedTrips.length === 0 ? (
+                  <div className="text-center py-8">
+                    <p className="text-gray-600">No trips joined yet</p>
+                    {isOwnProfile && (
+                      <Button
+                        onClick={() => navigate('/trips')}
+                        className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                      >
+                        Explore Trips
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
+                    {joinedTrips.map(renderTripCard)}
+                  </div>
+                )}
               </div>
             )}
-          </TabsContent>
-        </Tabs>
+          </div>
+        </div>
         
         {/* Add Experience Dialog */}
         {isOwnProfile && (
@@ -1065,15 +1698,84 @@ const ProfileComponent: React.FC = () => {
         {/* Following Dialog */}
         {renderFollowingDialog()}
         
-        {!username && (
-          <Button 
-            variant="destructive" 
-            className="w-full mt-4"
-            onClick={handleLogout}
-          >
-            Log Out
-          </Button>
-        )}
+        {/* Comments Dialog */}
+        <Dialog open={showComments} onOpenChange={setShowComments}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle>
+                {currentExperience?.title && `Comments on "${currentExperience.title}"`}
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="mt-4 space-y-4 max-h-[50vh] overflow-y-auto">
+              {loadingComments ? (
+                <div className="flex justify-center py-4">
+                  <Loader2 className="w-6 h-6 animate-spin" />
+                </div>
+              ) : comments.length === 0 ? (
+                <p className="text-center text-gray-500 py-4">
+                  No comments yet. Be the first to comment!
+                </p>
+              ) : (
+                comments.map((comment) => (
+                  <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
+                    <div className="flex gap-2">
+                      <Avatar className="h-8 w-8">
+                        <AvatarImage src={comment.user.profile_image} alt={comment.user.name} />
+                        <AvatarFallback>{comment.user.name[0]}</AvatarFallback>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex justify-between">
+                          <p className="font-medium text-sm">{comment.user.name}</p>
+                          <p className="text-xs text-gray-500">
+                            {new Date(comment.created_at).toLocaleDateString('en-US', { 
+                              month: 'short', 
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                        <p className="text-sm mt-1">{comment.content}</p>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            
+            {user && (
+              <div className="flex items-center gap-2 mt-4">
+                <Avatar className="h-8 w-8">
+                  <AvatarImage 
+                    src={user.user_metadata?.avatar_url || profileData?.profile_image} 
+                    alt={user.user_metadata?.name || profileData?.name || 'User'} 
+                  />
+                  <AvatarFallback>
+                    {(user.user_metadata?.name || profileData?.name || 'U')[0]}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1 flex gap-2">
+                  <Input
+                    placeholder="Add a comment..."
+                    value={commentText}
+                    onChange={(e) => setCommentText(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddComment();
+                      }
+                    }}
+                  />
+                  <Button 
+                    onClick={handleAddComment}
+                    disabled={!commentText.trim()}
+                  >
+                    Post
+                  </Button>
+                </div>
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
         
         <BottomNav />
       </div>
