@@ -125,18 +125,41 @@ const AddExperienceDialog = ({ open, onOpenChange, onExperienceAdded, userId }: 
           created_at: new Date().toISOString()
         });
 
-      if (experienceError) throw experienceError;
+      if (experienceError) {
+        console.error('Experience creation error:', experienceError);
+        throw new Error(experienceError.message || 'Failed to create experience');
+      }
 
-      // Update experiences count
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ 
-          experiences_count: supabase.rpc('increment'),
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId);
+      // The trigger we created in SQL should automatically update the user's experience count
+      // But we'll manually update it just in case the trigger isn't working
+      try {
+        // First get the current user data to get the current experiences_count
+        const { data: userData, error: fetchError } = await supabase
+          .from('users')
+          .select('experiences_count')
+          .eq('id', userId)
+          .single();
+          
+        if (fetchError) throw fetchError;
+        
+        // Calculate new count (default to 1 if null)
+        const currentCount = userData?.experiences_count || 0;
+        const newCount = currentCount + 1;
+        
+        // Update the count
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            experiences_count: newCount,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
 
-      if (updateError) throw updateError;
+        if (updateError) throw updateError;
+      } catch (countError) {
+        console.error('Error updating experience count:', countError);
+        // Continue anyway as the experience was created successfully
+      }
 
       toast({
         title: 'Success',

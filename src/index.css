@@ -1,4 +1,3 @@
-
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
 
 @tailwind base;
@@ -7,25 +6,20 @@
 
 @layer base {
   :root {
-    --background: 210 40% 98%;
+    --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
-
-    --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
-
-    --primary: 199 89% 48%;
+    /* Updated to a more vibrant blue theme */
+    --primary: 210 100% 50%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96.1%;
+    --secondary: 210 40% 96%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96.1%;
+    --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96.1%;
+    --accent: 210 40% 96%;
     --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
@@ -33,18 +27,94 @@
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 199 89% 48%;
+    --ring: 210 100% 50%;
 
-    --radius: 0.75rem;
+    --radius: 0.5rem;
 
-    --sidebar-background: 0 0% 98%;
-    --sidebar-foreground: 240 5.3% 26.1%;
-    --sidebar-primary: 240 5.9% 10%;
-    --sidebar-primary-foreground: 0 0% 98%;
-    --sidebar-accent: 240 4.8% 95.9%;
-    --sidebar-accent-foreground: 240 5.9% 10%;
+    /* Updated hireyth colors to blue theme */
+    --hireyth-main: 202 96% 48%;
+    --hireyth-dark: 217 90% 40%;
+    --hireyth-light: 202 96% 60%;
+    --hireyth-light-orange: 210 100% 68%;
+    --hireyth-lightest-blue: 210 100% 94%;
+
+    /* Card colors */
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    /* Popover colors */
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    
+    /* Sidebar colors - updated to blue theme */
+    --sidebar-background: 210 40% 96%;
+    --sidebar-foreground: 202 96% 48%;
+    --sidebar-muted: 210 40% 96%;
+    --sidebar-muted-foreground: 215.4 16.3% 46.9%;
+    --sidebar-card: 0 0% 100%;
+    --sidebar-card-foreground: 222.2 84% 4.9%;
     --sidebar-border: 220 13% 91%;
     --sidebar-ring: 217.2 91.2% 59.8%;
+    
+    /* Blue Theme Color Palette - enhanced for more vibrant blues */
+    --primary-blue-50: hsl(210, 100%, 97%);
+    --primary-blue-100: hsl(210, 100%, 94%);
+    --primary-blue-200: hsl(210, 100%, 88%);
+    --primary-blue-300: hsl(210, 100%, 80%);
+    --primary-blue-400: hsl(210, 100%, 68%);
+    --primary-blue-500: hsl(210, 100%, 56%);
+    --primary-blue-600: hsl(210, 100%, 50%);
+    --primary-blue-700: hsl(217, 90%, 40%); /* Our main dark blue color */
+    --primary-blue-800: hsl(217, 90%, 30%);
+    --primary-blue-900: hsl(217, 90%, 20%);
+    
+    --accent-indigo-500: hsl(230, 80%, 60%);
+    --accent-indigo-600: hsl(230, 80%, 50%);
+    --accent-indigo-700: hsl(230, 80%, 40%);
+    
+    --neutral-50: #f9fafb;
+    --neutral-100: #f3f4f6;
+    --neutral-200: #e5e7eb;
+    --neutral-300: #d1d5db;
+    --neutral-400: #9ca3af;
+    --neutral-500: #6b7280;
+    --neutral-600: #4b5563;
+    --neutral-700: #374151;
+    --neutral-800: #1f2937;
+    --neutral-900: #111827;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    /* Updated dark theme with blue emphasis */
+    --primary: 210 100% 60%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 210 100% 60%;
+
+    /* Dark theme card */
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    /* Dark theme popover */
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
   }
   
   * {
@@ -55,7 +125,10 @@
   
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: "ss01", "ss02", "cv01", "cv02";
+    font-feature-settings: "rlig" 1, "calt" 1;
+    background-color: #f8fafc;
+    color: #334155;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
   
   ::selection {
@@ -114,52 +187,287 @@
   }
 }
 
-/* Enhancing form elements */
-input, textarea, select {
-  @apply transition-all duration-300 ease-apple;
+/* Modern animated page transitions */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(10px);
+}
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 300ms, transform 300ms;
+}
+.page-transition-exit {
+  opacity: 1;
+}
+.page-transition-exit-active {
+  opacity: 0;
+  transition: opacity 200ms;
 }
 
-button {
-  @apply transition-all duration-300 ease-apple active:scale-[0.98];
-}
-
-/* Enhanced scrollbar */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  @apply bg-hireyth-blue/20 rounded-full;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  @apply bg-hireyth-blue/30;
-}
-
-/* Smooth scrolling */
+/* Smooth scrolling for the entire site */
 html {
   scroll-behavior: smooth;
 }
 
-/* Enhanced hover effects for links */
-a:not(.btn) {
-  @apply relative inline-block;
+/* Enhanced card styles */
+.card-hover-effect {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
 }
 
-a:not(.btn)::after {
-  @apply content-[''] absolute bottom-0 left-0 w-0 h-[1px] bg-hireyth-blue transition-all duration-300 ease-apple;
+.card-hover-effect:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
 }
 
-a:not(.btn):hover::after {
-  @apply w-full;
+/* Animated buttons */
+button, .btn {
+  position: relative;
+  overflow: hidden;
+  transition: all 0.3s ease;
+}
+
+button::after, .btn::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform 0.4s, opacity 0.6s;
+}
+
+button:active::after {
+  transform: scale(0, 0);
+  opacity: 0.3;
+  transition: 0s;
+}
+
+/* Animated gradients for headers */
+.animated-gradient-text {
+  background: linear-gradient(to right, var(--primary-blue-700), var(--primary-blue-500), var(--accent-indigo-600));
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 4s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+/* Animated cards for featured content */
+.animated-card {
+  position: relative;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  overflow: hidden;
+}
+
+.animated-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -75%;
+  z-index: 2;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(to right, rgba(255,255,255,0) 0%, rgba(255,255,255,0.3) 100%);
+  transform: skewX(-25deg);
+  transition: all 0.6s ease;
+  opacity: 0;
+}
+
+.animated-card:hover::before {
+  animation: shine 1s;
+}
+
+@keyframes shine {
+  100% {
+    left: 125%;
+    opacity: 1;
+  }
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-blue-600);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-blue-700);
+}
+
+/* Subtle animations for statistics counters */
+.stat-counter {
+  display: inline-block;
+  transition: transform 0.2s ease-in-out;
+}
+
+.stat-counter:hover {
+  transform: scale(1.05);
+  color: var(--primary-blue-700);
+}
+
+/* Enhanced input fields */
+input, textarea, select {
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 2px hsla(215.3, 19.3%, 34.5%, 0.2);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: box-shadow 0.3s ease;
+}
+
+/* Animate items when they come into view */
+.fade-in-up {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.fade-in-up.visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 
 /* Container padding adjustments */
 .container {
   @apply px-4 md:px-6 lg:px-8;
+}
+
+/* Modern Animated Page Transitions */
+.fade-in-up {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s ease-out, transform 0.6s ease-out;
+}
+
+.fade-in-up.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Animated Cards */
+.animated-card {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.animated-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.card-hover-effect {
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.card-hover-effect:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05);
+}
+
+/* Gradient Text Animation */
+.animated-gradient-text {
+  background: linear-gradient(to right, var(--primary-blue-700), var(--primary-blue-500), var(--accent-indigo-600));
+  background-size: 200% auto;
+  background-clip: text;
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: gradient-shift 4s ease infinite;
+}
+
+@keyframes gradient-shift {
+  0% { background-position: 0% center; }
+  50% { background-position: 100% center; }
+  100% { background-position: 0% center; }
+}
+
+/* Button animations */
+.group:hover .group-hover\:translate-x-1 {
+  transform: translateX(4px);
+}
+
+/* Button ripple effect */
+button {
+  position: relative;
+  overflow: hidden;
+}
+
+button::after {
+  content: '';
+  position: absolute;
+  width: 100%;
+  height: 100%;
+  top: 0;
+  left: 0;
+  pointer-events: none;
+  background-image: radial-gradient(circle, #fff 10%, transparent 10.01%);
+  background-repeat: no-repeat;
+  background-position: 50%;
+  transform: scale(10, 10);
+  opacity: 0;
+  transition: transform 0.4s, opacity 0.6s;
+}
+
+button:active::after {
+  transform: scale(0, 0);
+  opacity: 0.3;
+  transition: 0s;
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--neutral-100);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--primary-blue-600);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--primary-blue-700);
+}
+
+/* Stats Counter Animation */
+.stat-counter {
+  display: inline-block;
+  transition: transform 0.2s ease-in-out;
+}
+
+.stat-counter:hover {
+  transform: scale(1.05);
+  color: var(--primary-blue-700);
+}
+
+/* Input Fields Focus Effects */
+input:focus, textarea:focus, select:focus {
+  box-shadow: 0 0 0 2px hsla(215.3, 19.3%, 34.5%, 0.2);
+  outline: 2px solid transparent;
+  outline-offset: 2px;
+  transition: box-shadow 0.3s ease;
 }

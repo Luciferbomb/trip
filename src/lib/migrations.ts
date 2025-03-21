@@ -382,22 +382,20 @@ export const createTripParticipantsTable = async (): Promise<boolean> => {
  * @returns Promise<boolean> indicating success or failure
  */
 export const createExperiencesTable = async (): Promise<boolean> => {
-  // First try with SQL
-  const sqlSuccess = await executeSQL(createExperiencesTableSQL);
-  
-  if (sqlSuccess) {
+  try {
+    const { error } = await supabase.rpc('create_experiences_table', {});
+    
+    if (error) {
+      console.error('Error creating experiences table:', error);
+      return false;
+    }
+    
+    console.log('Experiences table created or already exists');
     return true;
+  } catch (error) {
+    console.error('Error:', error);
+    return false;
   }
-  
-  // Fallback to direct insert
-  return await createTableWithInsert('experiences', {
-    id: 'temp_experience_' + Date.now(),
-    user_id: 'temp_user',
-    title: 'Temporary Experience',
-    description: 'Temporary Description',
-    location: 'Temporary Location',
-    created_at: new Date().toISOString()
-  });
 };
 
 /**

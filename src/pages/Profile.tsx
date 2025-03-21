@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Image as ImageIcon, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X, Heart, MessageCircle, Globe, Grid, Bookmark, MapIcon } from 'lucide-react';
+import { Settings, Image as ImageIcon, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X, Heart, MessageCircle, Globe, Grid, Bookmark, MapIcon, AlertTriangle, RefreshCw, Server, UserX, Home, LogOut, Calendar, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BottomNav from '@/components/BottomNav';
@@ -22,6 +22,7 @@ import {
 import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { format } from 'date-fns';
 
 interface UserProfile {
   id: string;
@@ -55,6 +56,7 @@ interface Trip {
   start_date: string;
   end_date: string;
   spots: number;
+  creator_id: string;
   creator_name: string;
   creator_image: string;
   status?: string;
@@ -83,9 +85,6 @@ interface Experience {
   image_url: string | null;
   user_id: string;
   created_at: string;
-  likes_count: number;
-  comments_count: number;
-  is_liked?: boolean;
 }
 
 interface Comment {
@@ -123,7 +122,7 @@ interface DatabaseFollowingResponse {
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
-const ProfileComponent: React.FC = () => {
+const Profile = () => {
   const { username } = useParams<{ username: string }>();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -147,11 +146,7 @@ const ProfileComponent: React.FC = () => {
   const [following, setFollowing] = useState<Follower[]>([]);
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
-  const [showComments, setShowComments] = useState(false);
-  const [currentExperience, setCurrentExperience] = useState<Experience | null>(null);
-  const [comments, setComments] = useState<Comment[]>([]);
-  const [loadingComments, setLoadingComments] = useState(false);
-  const [commentText, setCommentText] = useState('');
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user) {
@@ -211,10 +206,11 @@ const ProfileComponent: React.FC = () => {
       supabase.removeChannel(channel);
     };
   }, [profileData?.id]);
-
+  
   const fetchProfileData = async () => {
     try {
       setLoading(true);
+      setError(null); // Reset error state
       
       let userData;
       
@@ -228,6 +224,7 @@ const ProfileComponent: React.FC = () => {
           
         if (error) throw error;
         if (!data) {
+          setError('Could not find your profile.');
           toast({
             title: 'Error',
             description: 'Could not find your profile.',
@@ -247,6 +244,7 @@ const ProfileComponent: React.FC = () => {
           
         if (error) throw error;
         if (!data) {
+          setError('Profile not found');
           navigate('/404');
           return;
         }
@@ -260,6 +258,7 @@ const ProfileComponent: React.FC = () => {
         userData = data;
       } else {
         // No username and no user - should not happen
+        setError('You must be logged in to view profiles');
         navigate('/login');
         return;
       }
@@ -275,6 +274,7 @@ const ProfileComponent: React.FC = () => {
       
       // Check if current user is following this profile
       if (user && userData && user.id !== userData.id) {
+        try {
         const { data: followData } = await supabase
           .from('user_follows')
           .select('*')
@@ -283,63 +283,189 @@ const ProfileComponent: React.FC = () => {
           .single();
           
         setIsFollowing(!!followData);
+        } catch (followError) {
+          console.error('Error checking follow status:', followError);
+          // Failing to check follow status is not critical, continue
+        }
       }
       
       // Fetch experiences
+      try {
+        // First fetch basic experience data without nested counts
       const { data: experienceData, error: expError } = await supabase
         .from('experiences')
-        .select(`
-          *,
-          likes_count:experience_likes(count),
-          comments_count:experience_comments(count)
-        `)
+        .select('*')
         .eq('user_id', userData.id)
         .order('created_at', { ascending: false });
         
-      if (expError) throw expError;
-      
-      // Check if the current user has liked any of these experiences
-      let processedExperiences = experienceData || [];
-      
-      if (user) {
-        const { data: userLikes, error: likesError } = await supabase
-          .from('experience_likes')
-          .select('experience_id')
-          .eq('user_id', user.id)
-          .in('experience_id', processedExperiences.map(exp => exp.id));
-          
-        if (!likesError && userLikes) {
-          const likedExperienceIds = new Set(userLikes.map(like => like.experience_id));
-          
-          processedExperiences = processedExperiences.map(exp => ({
+        if (expError) {
+          if (expError.code === '42P01') {
+            // Table does not exist error, try to run migrations
+            console.error('Experiences table does not exist:', expError);
+            // Set empty experiences array to avoid breaking the UI
+            setExperiences([]);
+            setError('Database setup needed. Please wait while we set up your profile or click "Run Setup" below.');
+            
+            // Try to run migrations to create the table
+            try {
+              const { createExperiencesTable, createExperienceLikesTable, createExperienceCommentsTable } = await import('@/lib/migrations');
+              
+              // Run the functions in sequence
+              const experiencesCreated = await createExperiencesTable();
+              if (experiencesCreated) {
+                console.log('Experiences table created successfully');
+                
+                // Now try to create the dependent tables
+                await createExperienceLikesTable();
+                await createExperienceCommentsTable();
+                
+                // Show success message
+                toast({
+                  title: 'Setup completed',
+                  description: 'Your profile is now ready. Please refresh the page.',
+                  duration: 5000,
+                });
+              } else {
+                // Show error message
+                toast({
+                  title: 'Setup failed',
+                  description: 'Could not set up your profile. Please try again later.',
+                  variant: 'destructive',
+                  duration: 5000,
+                });
+              }
+            } catch (migrationError) {
+              console.error('Failed to run migrations:', migrationError);
+              setError('Failed to set up your profile. Please try again later.');
+            }
+          } else {
+            console.error('Error fetching experiences:', expError);
+            // Just set empty experiences instead of showing an error
+            setExperiences([]);
+            console.log('Setting experiences to empty array due to fetch error');
+          }
+        } else {
+          // Initialize experiences with zero counts
+          let processedExperiences = (experienceData || []).map(exp => ({
             ...exp,
-            is_liked: likedExperienceIds.has(exp.id),
-            likes_count: exp.likes_count.count || 0,
-            comments_count: exp.comments_count.count || 0
+            likes_count: 0,
+            comments_count: 0,
+            is_liked: false
           }));
+          
+          // If we have experiences, fetch their likes and comments counts separately
+          if (processedExperiences.length > 0) {
+            const experienceIds = processedExperiences.map(exp => exp.id);
+            
+            // Fetch likes counts
+            try {
+              const { data: likesData, error: likesError } = await supabase
+                .from('experience_likes')
+                .select('experience_id')
+                .in('experience_id', experienceIds);
+                
+              if (!likesError && likesData) {
+                // Count likes per experience
+                const likesCountMap = new Map();
+                likesData.forEach(like => {
+                  const count = likesCountMap.get(like.experience_id) || 0;
+                  likesCountMap.set(like.experience_id, count + 1);
+                });
+                
+                // Update likes count
+                processedExperiences = processedExperiences.map(exp => ({
+                  ...exp,
+                  likes_count: likesCountMap.get(exp.id) || 0
+                }));
+              }
+            } catch (likesErr) {
+              console.error('Error fetching likes counts:', likesErr);
+            }
+            
+            // Fetch comments counts
+            try {
+              const { data: commentsData, error: commentsError } = await supabase
+                .from('experience_comments')
+                .select('experience_id')
+                .in('experience_id', experienceIds);
+                
+              if (!commentsError && commentsData) {
+                // Count comments per experience
+                const commentsCountMap = new Map();
+                commentsData.forEach(comment => {
+                  const count = commentsCountMap.get(comment.experience_id) || 0;
+                  commentsCountMap.set(comment.experience_id, count + 1);
+                });
+                
+                // Update comments count
+                processedExperiences = processedExperiences.map(exp => ({
+                  ...exp,
+                  comments_count: commentsCountMap.get(exp.id) || 0
+                }));
+              }
+            } catch (commentsErr) {
+              console.error('Error fetching comments counts:', commentsErr);
+            }
+            
+            // Check if user has liked any experiences
+            if (user) {
+              try {
+                const { data: userLikes, error: likesError } = await supabase
+                  .from('experience_likes')
+                  .select('experience_id')
+                  .eq('user_id', user.id)
+                  .in('experience_id', experienceIds);
+                  
+                if (!likesError && userLikes) {
+                  // Create a set of liked experience IDs for efficient lookup
+                  const likedExperienceIds = new Set(userLikes.map(like => like.experience_id));
+                  
+                  // Mark experiences as liked or not
+                  processedExperiences = processedExperiences.map(exp => ({
+                    ...exp,
+                    is_liked: likedExperienceIds.has(exp.id)
+                  }));
+                }
+              } catch (likesError) {
+                console.error('Error fetching user likes:', likesError);
+              }
+            }
+          }
+          
+          setExperiences(processedExperiences);
         }
-      } else {
-        processedExperiences = processedExperiences.map(exp => ({
-          ...exp,
-          is_liked: false,
-          likes_count: exp.likes_count.count || 0,
-          comments_count: exp.comments_count.count || 0
-        }));
+      } catch (err) {
+        console.error('Unexpected error fetching experiences:', err);
+        setExperiences([]);
+        // Toast to inform the user
+        toast({
+          title: 'Error loading experiences',
+          description: 'There was an issue loading experiences. Please try refreshing the page.',
+          variant: 'destructive',
+        });
       }
       
-      setExperiences(processedExperiences);
-      
       // Fetch created trips
+      try {
       const { data: createdTripsData, error: createdTripsError } = await supabase
         .from('trips')
         .select('*')
         .eq('creator_id', userData.id)
         .order('created_at', { ascending: false });
       
-      if (createdTripsError) throw createdTripsError;
+        if (createdTripsError) {
+          console.error('Error fetching created trips:', createdTripsError);
+          setCreatedTrips([]);
+        } else {
       setCreatedTrips(createdTripsData || []);
+        }
+      } catch (tripsError) {
+        console.error('Error fetching created trips:', tripsError);
+        setCreatedTrips([]);
+      }
       
       // Fetch joined trips (including pending requests)
+      try {
       const { data: participationsData, error: participationsError } = await supabase
         .from('trip_participants')
         .select(`
@@ -358,8 +484,10 @@ const ProfileComponent: React.FC = () => {
         `)
         .eq('user_id', userData.id) as { data: DatabaseTripParticipation[] | null, error: any };
       
-      if (participationsError) throw participationsError;
-      
+        if (participationsError) {
+          console.error('Error fetching joined trips:', participationsError);
+          setJoinedTrips([]);
+        } else {
       const joinedTripsData = (participationsData || [])
         .filter(p => p.trips)
         .map(p => ({
@@ -368,12 +496,18 @@ const ProfileComponent: React.FC = () => {
         }));
       
       setJoinedTrips(joinedTripsData);
+        }
+      } catch (joinedTripsError) {
+        console.error('Error fetching joined trips:', joinedTripsError);
+        setJoinedTrips([]);
+      }
       
-    } catch (error: any) {
+    } catch (error) {
       console.error('Error fetching profile:', error);
+      setError('Could not load profile data. Please try again.');
       toast({
         title: 'Error',
-        description: 'Failed to load profile. Please try again.',
+        description: 'Failed to load profile data.',
         variant: 'destructive'
       });
     } finally {
@@ -492,64 +626,41 @@ const ProfileComponent: React.FC = () => {
     if (!profileData) return;
     
     try {
-      // Fetch updated experiences
+      // Fetch basic experience data
       const { data: experienceData, error: expError } = await supabase
         .from('experiences')
-        .select(`
-          *,
-          likes_count:experience_likes(count),
-          comments_count:experience_comments(count)
-        `)
+        .select('*')
         .eq('user_id', profileData.id)
         .order('created_at', { ascending: false });
         
       if (expError) throw expError;
       
-      // Process the fetched experiences
-      let processedExperiences = experienceData || [];
-      
-      if (user) {
-        const { data: userLikes, error: likesError } = await supabase
-          .from('experience_likes')
-          .select('experience_id')
-          .eq('user_id', user.id)
-          .in('experience_id', processedExperiences.map(exp => exp.id));
-          
-        if (!likesError && userLikes) {
-          const likedExperienceIds = new Set(userLikes.map(like => like.experience_id));
-          
-          processedExperiences = processedExperiences.map(exp => ({
-            ...exp,
-            is_liked: likedExperienceIds.has(exp.id),
-            likes_count: exp.likes_count.count || 0,
-            comments_count: exp.comments_count.count || 0
-          }));
-        }
-      } else {
-        processedExperiences = processedExperiences.map(exp => ({
-          ...exp,
-          is_liked: false,
-          likes_count: exp.likes_count.count || 0,
-          comments_count: exp.comments_count.count || 0
-        }));
+      // Handle no experiences case
+      if (!experienceData || experienceData.length === 0) {
+        setExperiences([]);
+        return;
       }
       
-      setExperiences(processedExperiences);
+      // Set the experiences state
+      setExperiences(experienceData);
       
-      // Update profile data to reflect new experiences count
-      const { data: userData, error: userError } = await supabase
-        .from('users')
-        .select('experiences_count')
-        .eq('id', profileData.id)
-        .single();
-        
-      if (userError) throw userError;
-      
-      setProfileData(prev => prev ? {
-        ...prev,
-        experiences_count: userData.experiences_count
-      } : null);
-      
+      // Update profile data with latest experience count
+      try {
+        const { data: userData, error: userError } = await supabase
+          .from('users')
+          .select('experiences_count')
+          .eq('id', profileData.id)
+          .single();
+          
+        if (!userError && userData) {
+          setProfileData(prevData => ({
+            ...prevData!,
+            experiences_count: userData.experiences_count
+          }));
+        }
+      } catch (userErr) {
+        console.error('Error updating profile data:', userErr);
+      }
     } catch (error) {
       console.error('Error refreshing experiences:', error);
       toast({
@@ -760,11 +871,7 @@ const ProfileComponent: React.FC = () => {
         setExperiences(prev => 
           prev.map(exp => 
             exp.id === experienceId 
-              ? { 
-                  ...exp, 
-                  is_liked: false,
-                  likes_count: Math.max(0, exp.likes_count - 1)
-                } 
+              ? { ...exp } 
               : exp
           )
         );
@@ -783,11 +890,7 @@ const ProfileComponent: React.FC = () => {
         setExperiences(prev => 
           prev.map(exp => 
             exp.id === experienceId 
-              ? { 
-                  ...exp, 
-                  is_liked: true,
-                  likes_count: (exp.likes_count || 0) + 1
-                } 
+              ? { ...exp } 
               : exp
           )
         );
@@ -802,33 +905,114 @@ const ProfileComponent: React.FC = () => {
     }
   };
 
-  const renderTripCard = (trip: Trip) => (
-    <div
-      key={trip.id}
-      className="bg-white rounded-lg shadow-sm overflow-hidden cursor-pointer hover:shadow-md transition-shadow"
-      onClick={() => navigate(`/trips/${trip.id}`)}
-    >
-      <img
-        src={trip.image_url}
-        alt={trip.title}
-        className="w-full h-48 object-cover"
-      />
-      <div className="p-4">
-        <h3 className="font-semibold text-lg">{trip.title}</h3>
-        <p className="text-gray-600">{trip.location}</p>
-        <div className="flex items-center justify-between mt-2">
-          <div className="text-sm text-gray-500">
-            {new Date(trip.start_date).toLocaleDateString()} - {new Date(trip.end_date).toLocaleDateString()}
+  const handleDeleteTrip = async (tripId: string, e: React.MouseEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    
+    if (!confirm('Are you sure you want to delete this trip?')) return;
+    
+    try {
+      // Delete trip participants first (due to foreign key constraint)
+      const { error: participantsError } = await supabase
+        .from('trip_participants')
+        .delete()
+        .eq('trip_id', tripId);
+      
+      if (participantsError) throw participantsError;
+      
+      // Delete the trip
+      const { error: tripError } = await supabase
+        .from('trips')
+        .delete()
+        .eq('id', tripId)
+        .eq('creator_id', user?.id); // Ensure only creator can delete
+      
+      if (tripError) throw tripError;
+      
+      // Update local state to remove the deleted trip
+      setCreatedTrips(trips => trips.filter(t => t.id !== tripId));
+      
+      toast({
+        title: 'Success',
+        description: 'Trip deleted successfully',
+      });
+      
+    } catch (error: any) {
+      console.error('Error deleting trip:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'Failed to delete trip',
+        variant: 'destructive'
+      });
+    }
+  };
+
+  const renderTripCard = (trip: Trip) => {
+    const isOwner = user?.id === trip.creator_id;
+    
+    return (
+      <div key={trip.id} className="relative group">
+        <Link to={`/trips/${trip.id}`} className="block">
+          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg">
+            <div className="relative aspect-[16/9] overflow-hidden">
+              <img
+                src={trip.image_url}
+                alt={trip.title}
+                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              
+              {/* Creator Info - Overlaid on image */}
+              <div className="absolute bottom-4 left-4 flex items-center">
+                <img
+                  src={trip.creator_image}
+                  alt={trip.creator_name}
+                  className="w-8 h-8 rounded-full border-2 border-white object-cover"
+                />
+                <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
+              </div>
+            </div>
+            
+            <div className="p-4">
+              <h3 className="text-lg font-semibold text-gray-900 mb-1">{trip.title}</h3>
+              <div className="flex items-center text-gray-600 mb-2">
+                <MapPin className="w-4 h-4 mr-1" />
+                <span>{trip.location}</span>
+              </div>
+              
+              <div className="flex items-center text-gray-600">
+                <Calendar className="w-4 h-4 mr-1" />
+                <span className="text-sm">
+                  {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
+                </span>
+              </div>
+              
+              {trip.status && (
+                <div className="mt-2">
+                  <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'}>
+                    {trip.status}
+                  </Badge>
+                </div>
+              )}
+            </div>
           </div>
-          {trip.status && (
-            <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'}>
-              {trip.status}
-            </Badge>
-          )}
-        </div>
+        </Link>
+        
+        {isOwner && (
+          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+            <Button
+              variant="destructive"
+              size="sm"
+              className="bg-red-500/90 hover:bg-red-600"
+              onClick={(e) => handleDeleteTrip(trip.id, e)}
+            >
+              <Trash2 className="w-4 h-4" />
+            </Button>
+          </div>
+        )}
       </div>
-    </div>
-  );
+    );
+  };
 
   // Update the followers dialog content
   const renderFollowersDialog = () => (
@@ -846,22 +1030,22 @@ const ProfileComponent: React.FC = () => {
             <p className="text-center text-gray-500">No followers yet</p>
           ) : (
             followers.map((follower) => (
-              <div key={follower.id} className="flex items-center justify-between">
-                <Link 
-                  to={`/profile/${follower.username}`}
-                  className="flex items-center space-x-3"
-                  onClick={() => setShowFollowers(false)}
-                >
+            <div key={follower.id} className="flex items-center justify-between">
+              <Link 
+                to={`/profile/${follower.username}`}
+                className="flex items-center space-x-3"
+                onClick={() => setShowFollowers(false)}
+              >
                   <Avatar>
                     <AvatarImage src={follower.profile_image} alt={follower.name} />
                     <AvatarFallback>{follower.name[0]}</AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-medium">{follower.name}</p>
-                    <p className="text-sm text-gray-500">@{follower.username}</p>
-                  </div>
-                </Link>
-              </div>
+                <div>
+                  <p className="font-medium">{follower.name}</p>
+                  <p className="text-sm text-gray-500">@{follower.username}</p>
+                </div>
+              </Link>
+            </div>
             ))
           )}
         </div>
@@ -885,22 +1069,22 @@ const ProfileComponent: React.FC = () => {
             <p className="text-center text-gray-500">Not following anyone yet</p>
           ) : (
             following.map((follow) => (
-              <div key={follow.id} className="flex items-center justify-between">
-                <Link 
-                  to={`/profile/${follow.username}`}
-                  className="flex items-center space-x-3"
-                  onClick={() => setShowFollowing(false)}
-                >
+            <div key={follow.id} className="flex items-center justify-between">
+              <Link 
+                to={`/profile/${follow.username}`}
+                className="flex items-center space-x-3"
+                onClick={() => setShowFollowing(false)}
+              >
                   <Avatar>
                     <AvatarImage src={follow.profile_image} alt={follow.name} />
                     <AvatarFallback>{follow.name[0]}</AvatarFallback>
                   </Avatar>
-                  <div>
-                    <p className="font-medium">{follow.name}</p>
-                    <p className="text-sm text-gray-500">@{follow.username}</p>
-                  </div>
-                </Link>
-              </div>
+                <div>
+                  <p className="font-medium">{follow.name}</p>
+                  <p className="text-sm text-gray-500">@{follow.username}</p>
+                </div>
+              </Link>
+            </div>
             ))
           )}
         </div>
@@ -963,6 +1147,21 @@ const ProfileComponent: React.FC = () => {
     const mapContainer = useRef<HTMLDivElement>(null);
     const map = useRef<mapboxgl.Map | null>(null);
     const [locations, setLocations] = useState<[number, number][]>([]);
+    const [mapError, setMapError] = useState<boolean>(false);
+    const [mapLoading, setMapLoading] = useState<boolean>(true);
+    
+    // Reset states when userId changes
+    useEffect(() => {
+      setMapError(false);
+      setMapLoading(true);
+      setLocations([]);
+      
+      // Cleanup previous map instance
+      if (map.current) {
+        map.current.remove();
+        map.current = null;
+      }
+    }, [userId]);
     
     useEffect(() => {
       // Fetch locations visited by user
@@ -1032,246 +1231,218 @@ const ProfileComponent: React.FC = () => {
             [2.3522, 48.8566],   // Paris
             [139.6503, 35.6762]  // Tokyo
           ]);
+        } finally {
+          setMapLoading(false);
         }
       };
       
+      // Start fetching locations immediately
       fetchUserLocations();
     }, [userId]);
     
     useEffect(() => {
-      if (!mapContainer.current || locations.length === 0) return;
+      if (!mapContainer.current || locations.length === 0 || mapLoading) return;
       
-      // Initialize map
-      map.current = new mapboxgl.Map({
-        container: mapContainer.current,
-        style: 'mapbox://styles/mapbox/light-v11',
-        center: locations[0],
-        zoom: 1.8,
-        projection: 'globe',
-        interactive: false, // Disable interaction
-        attributionControl: false,
-        bearing: 30, // Add slight rotation for visual interest
-        pitch: 20  // Add slight tilt for better 3D effect
-      });
-      
-      // Add atmosphere and styling
-      map.current.on('load', () => {
-        if (!map.current) return;
-        
-        // Set atmosphere
-        map.current.setFog({
-          color: 'rgb(186, 228, 255)',
-          'high-color': 'rgb(145, 205, 242)',
-          'horizon-blend': 0.1,
-          'space-color': 'rgb(200, 230, 255)',
-          'star-intensity': 0
+      try {
+        // Check if map already exists - cleanup first
+        if (map.current) {
+          map.current.remove();
+          map.current = null;
+        }
+
+        // Initialize map
+        map.current = new mapboxgl.Map({
+          container: mapContainer.current,
+          style: 'mapbox://styles/mapbox/light-v11',
+          center: locations[0],
+          zoom: 1.8,
+          projection: 'globe',
+          interactive: false, // Disable interaction
+          attributionControl: false,
+          bearing: 30, // Add slight rotation for visual interest
+          pitch: 20,  // Add slight tilt for better 3D effect
+          fadeDuration: 0 // Prevent fade-in animation
         });
         
-        // Add source for visited locations
-        map.current.addSource('locations', {
-          type: 'geojson',
-          data: {
-            type: 'FeatureCollection',
-            features: locations.map((coords, i) => ({
-              type: 'Feature',
-              properties: {},
-              geometry: {
-                type: 'Point',
-                coordinates: coords
-              }
-            }))
-          }
-        });
-        
-        // Add points
-        map.current.addLayer({
-          id: 'location-points',
-          type: 'circle',
-          source: 'locations',
-          paint: {
-            'circle-radius': 6,
-            'circle-color': '#FF4081',
-            'circle-opacity': 0.8,
-            'circle-stroke-width': 2,
-            'circle-stroke-color': 'white',
-            'circle-stroke-opacity': 0.7
-          }
-        });
-        
-        // Add connections between points if we have multiple
-        if (locations.length > 1) {
-          map.current.addSource('connections', {
-            type: 'geojson',
-            data: {
-              type: 'Feature',
-              properties: {},
-              geometry: {
-                type: 'LineString',
-                coordinates: locations
-              }
+        // Add atmosphere and styling
+        map.current.on('load', () => {
+          if (!map.current) return;
+          
+          // Add atmosphere layer
+          map.current.setFog({
+            color: 'rgb(220, 230, 240)',
+            'high-color': 'rgb(36, 92, 223)',
+            'horizon-blend': 0.1,
+            'space-color': 'rgb(11, 11, 25)',
+            'star-intensity': 0.6
+          });
+          
+          // Add markers for each location
+          locations.forEach((loc) => {
+            const el = document.createElement('div');
+            el.className = 'location-marker';
+            el.style.backgroundColor = '#E63946';
+            el.style.width = '12px';
+            el.style.height = '12px';
+            el.style.borderRadius = '50%';
+            el.style.border = '2px solid white';
+            el.style.boxShadow = '0 0 10px rgba(0, 0, 0, 0.3)';
+            
+            try {
+              new mapboxgl.Marker(el).setLngLat(loc).addTo(map.current!);
+            } catch (err) {
+              console.error('Failed to add marker:', err);
+              // Continue with other markers
             }
           });
           
-          map.current.addLayer({
-            id: 'route',
-            type: 'line',
-            source: 'connections',
-            layout: {
-              'line-join': 'round',
-              'line-cap': 'round'
-            },
-            paint: {
-              'line-color': '#FF4081',
-              'line-width': 2,
-              'line-opacity': 0.6,
-              'line-dasharray': [0, 2, 1]
+          // Auto-rotate the camera for a dynamic effect
+          let animationFrameId: number;
+          const rotateCamera = () => {
+            if (!map.current) return;
+            
+            try {
+              const center = map.current.getCenter();
+              center.lng -= 0.1; // Rotate speed
+              map.current.easeTo({
+                center,
+                duration: 100,
+                easing: (t) => t
+              });
+              
+              // Request next frame
+              animationFrameId = requestAnimationFrame(rotateCamera);
+            } catch (err) {
+              console.error('Error in rotation animation:', err);
+              cancelAnimationFrame(animationFrameId);
+              setMapError(true);
             }
-          });
-        }
+          };
+          
+          // Start rotation animation
+          rotateCamera();
+        });
         
-        // Add subtle gradient overlay for better text visibility
-        const mapCanvas = map.current.getCanvas();
-        const wrapper = mapCanvas.parentElement;
-        if (wrapper) {
-          const overlay = document.createElement('div');
-          overlay.style.position = 'absolute';
-          overlay.style.top = '0';
-          overlay.style.left = '0';
-          overlay.style.width = '100%';
-          overlay.style.height = '100%';
-          overlay.style.background = 'linear-gradient(0deg, rgba(0,0,0,0.2) 0%, rgba(0,0,0,0) 100%)';
-          overlay.style.pointerEvents = 'none';
-          overlay.style.zIndex = '1';
-          wrapper.appendChild(overlay);
-        }
-        
-        // Auto-rotate camera for visual interest
-        const rotateCamera = () => {
-          if (!map.current) return;
-          map.current.rotateTo((map.current.getBearing() + 0.05) % 360, { 
-            duration: 0,
-            easing: (t) => t
-          });
-          requestAnimationFrame(rotateCamera);
-        };
-        
-        requestAnimationFrame(rotateCamera);
-      });
+        // Handle map errors
+        map.current.on('error', (e) => {
+          console.error('Mapbox error:', e);
+          setMapError(true);
+        });
+      } catch (err) {
+        console.error('Error initializing map:', err);
+        setMapError(true);
+      }
       
-      // Clean up
+      // Cleanup when component unmounts
       return () => {
         if (map.current) {
           map.current.remove();
           map.current = null;
         }
       };
-    }, [locations]);
+    }, [locations, mapLoading]);
+    
+    // If there's an error or map is still loading, return a gradient background instead
+    if (mapError || mapLoading) {
+      return (
+        <div className="h-full w-full bg-gradient-to-r from-hireyth-light to-hireyth-main rounded-t-xl overflow-hidden"></div>
+      );
+    }
     
     return (
       <div 
         ref={mapContainer} 
-        className="w-full h-full"
+        className="h-full w-full rounded-t-xl overflow-hidden bg-gray-100"
       />
     );
   };
 
-  const fetchComments = async (experienceId: string) => {
-    if (!experienceId) return;
-    
-    try {
-      setLoadingComments(true);
-      
-      const { data, error } = await supabase
-        .from('experience_comments')
-        .select(`
-          *,
-          user:users(name, profile_image, username)
-        `)
-        .eq('experience_id', experienceId)
-        .order('created_at', { ascending: true });
-        
-      if (error) throw error;
-      
-      setComments(data || []);
-    } catch (error) {
-      console.error('Error fetching comments:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to load comments',
-        variant: 'destructive'
-      });
-    } finally {
-      setLoadingComments(false);
-    }
-  };
-  
-  const handleOpenComments = (experience: Experience) => {
-    setCurrentExperience(experience);
-    setShowComments(true);
-    fetchComments(experience.id);
-  };
-  
-  const handleAddComment = async () => {
-    if (!user || !currentExperience || !commentText.trim()) return;
-    
-    try {
-      const { error } = await supabase
-        .from('experience_comments')
-        .insert({
-          experience_id: currentExperience.id,
-          user_id: user.id,
-          content: commentText.trim()
-        });
-        
-      if (error) throw error;
-      
-      // Refresh comments
-      fetchComments(currentExperience.id);
-      
-      // Update comment count in experiences list
-      setExperiences(prev => 
-        prev.map(exp => 
-          exp.id === currentExperience.id 
-            ? { ...exp, comments_count: exp.comments_count + 1 } 
-            : exp
-        )
-      );
-      
-      // Clear comment text
-      setCommentText('');
-      
-      toast({
-        title: 'Success',
-        description: 'Comment added successfully'
-      });
-    } catch (error) {
-      console.error('Error adding comment:', error);
-      toast({
-        title: 'Error',
-        description: 'Failed to add comment',
-        variant: 'destructive'
-      });
-    }
-  };
-
-  if (loading) {
+  // If there's an error
+  if (error) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex items-center justify-center h-[calc(100vh-64px)]">
-          <Loader2 className="w-8 h-8 animate-spin" />
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+        <div className="bg-red-50 border border-red-200 p-6 rounded-lg shadow-sm max-w-lg w-full">
+          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-red-800 mb-2">Error</h3>
+          <p className="text-red-700 mb-6">{error}</p>
+          <div className="flex flex-col sm:flex-row gap-3 justify-center">
+            <Button 
+              variant="outline" 
+              onClick={() => window.location.reload()}
+              className="flex items-center gap-2"
+            >
+              <RefreshCw className="h-4 w-4" />
+              Refresh Page
+            </Button>
+            
+            {error.includes('Database setup') && (
+              <Button 
+                onClick={async () => {
+                  try {
+                    setLoading(true);
+                    const { createExperiencesTable, createExperienceLikesTable, createExperienceCommentsTable } = await import('@/lib/migrations');
+                    
+                    await createExperiencesTable();
+                    await createExperienceLikesTable();
+                    await createExperienceCommentsTable();
+                    
+                    toast({
+                      title: 'Setup completed',
+                      description: 'Please refresh the page to see your profile.',
+                      duration: 5000,
+                    });
+                    
+                    // Refresh the page after a short delay
+                    setTimeout(() => window.location.reload(), 2000);
+                  } catch (e) {
+                    console.error('Failed to run setup:', e);
+                    toast({
+                      title: 'Setup failed',
+                      description: 'Please try again later.',
+                      variant: 'destructive',
+                    });
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="flex items-center gap-2"
+              >
+                <Server className="h-4 w-4" />
+                Run Setup
+              </Button>
+            )}
+          </div>
         </div>
       </div>
     );
   }
   
+  // If profile not found
   if (!profileData) {
     return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="max-w-2xl mx-auto p-4">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold">Profile not found</h1>
-            <p className="text-gray-600 mt-2">The profile you're looking for doesn't exist.</p>
+      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
+        <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg shadow-sm max-w-lg w-full">
+          <UserX className="h-12 w-12 text-gray-500 mx-auto mb-4" />
+          <h3 className="text-lg font-bold text-gray-800 mb-2">Profile not found</h3>
+          <p className="text-gray-600 mb-6">The profile you're looking for doesn't exist.</p>
+          <Link 
+            to="/" 
+            className="inline-flex items-center gap-2 px-4 py-2 bg-hireyth-main text-white rounded-md hover:bg-hireyth-dark transition-colors"
+          >
+            <Home className="h-4 w-4" />
+            Go Home
+          </Link>
           </div>
+      </div>
+    );
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50">
+        <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)]">
+          <Loader2 className="w-8 h-8 animate-spin text-hireyth-main mb-4" />
+          <p className="text-gray-600">Loading profile...</p>
         </div>
       </div>
     );
@@ -1286,7 +1457,7 @@ const ProfileComponent: React.FC = () => {
         <div className="mb-8">
           <div className="relative mb-20 sm:mb-24">
             {/* Cover Image with Map Background */}
-            <div className="h-48 sm:h-64 rounded-xl overflow-hidden shadow-sm">
+            <div className="h-48 sm:h-64 rounded-xl overflow-hidden shadow-sm relative">
               {profileData && (
                 <div className="absolute inset-0 w-full h-full">
                   <ProfileMapBackground userId={profileData.id} />
@@ -1295,17 +1466,17 @@ const ProfileComponent: React.FC = () => {
             </div>
             
             {/* Profile Image */}
-            <div className="absolute -bottom-16 sm:-bottom-20 left-1/2 -translate-x-1/2 shadow-md rounded-full border-4 border-white">
+            <div className="absolute -bottom-16 sm:-bottom-20 left-1/2 -translate-x-1/2 shadow-md rounded-full border-4 border-white bg-white z-10">
               <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-white">
-                <img
-                  src={profileData?.profile_image}
-                  alt={profileData?.name}
+              <img
+                src={profileData?.profile_image}
+                alt={profileData?.name}
                   className="w-full h-full object-cover"
                   loading="lazy"
-                />
+              />
               </div>
             </div>
-          </div>
+            </div>
           
           {/* User Info */}
           <div className="text-center mb-6">
@@ -1471,20 +1642,20 @@ const ProfileComponent: React.FC = () => {
                   variant="outline"
                   size="sm"
                   onClick={handleLogout}
-                  className="flex items-center"
+                  className="flex items-center text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
                 >
-                  <Settings className="w-4 h-4 mr-2" />
-                  Settings
+                  <LogOut className="w-4 h-4 mr-2" />
+                  Logout
                 </Button>
               )}
-            </div>
-          </div>
+              </div>
+                </div>
         </div>
         
         {/* Tabs */}
         <div className="mb-6">
           <div className="flex justify-center border-b border-gray-200 mb-6">
-            <button
+                <button
               className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
                 activeTab === 'experiences' 
                   ? 'border-hireyth-main text-hireyth-main' 
@@ -1494,8 +1665,8 @@ const ProfileComponent: React.FC = () => {
             >
               <Grid className="w-4 h-4 mr-2" />
               <span>Experiences</span>
-            </button>
-            <button
+                </button>
+                <button
               className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
                 activeTab === 'created' 
                   ? 'border-hireyth-main text-hireyth-main' 
@@ -1505,7 +1676,7 @@ const ProfileComponent: React.FC = () => {
             >
               <MapIcon className="w-4 h-4 mr-2" />
               <span>Created</span>
-            </button>
+                </button>
             <button
               className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
                 activeTab === 'joined' 
@@ -1517,8 +1688,8 @@ const ProfileComponent: React.FC = () => {
               <Bookmark className="w-4 h-4 mr-2" />
               <span>Joined</span>
             </button>
-          </div>
-          
+        </div>
+        
           {/* Tab Content */}
           <div>
             {activeTab === 'experiences' && (
@@ -1526,25 +1697,25 @@ const ProfileComponent: React.FC = () => {
                 {experiences.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-600">No experiences shared yet</p>
-                    {isOwnProfile && (
-                      <Button
-                        onClick={() => setShowAddExperience(true)}
+              {isOwnProfile && (
+                <Button
+                  onClick={() => setShowAddExperience(true)}
                         className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
-                      >
+                >
                         Add Your First Experience
-                      </Button>
-                    )}
+                </Button>
+              )}
                   </div>
                 ) : (
                   <>
                     <div className="space-y-6">
-                      {experiences.map((exp: Experience) => (
+                  {experiences.map((exp: Experience) => (
                         <div key={exp.id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow duration-300">
                           <div className="relative">
                             {exp.image_url ? (
-                              <img
-                                src={exp.image_url}
-                                alt={exp.title}
+                        <img
+                          src={exp.image_url}
+                          alt={exp.title}
                                 className="w-full h-56 object-cover"
                                 onError={(e) => {
                                   e.currentTarget.src = 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80';
@@ -1553,24 +1724,24 @@ const ProfileComponent: React.FC = () => {
                             ) : (
                               <div className="w-full h-56 bg-gray-100 flex items-center justify-center">
                                 <ImageIcon className="h-12 w-12 text-gray-300" />
-                              </div>
+                          </div>
                             )}
                             
                             <Badge className="absolute top-3 right-3 bg-white/80 text-gray-800 hover:bg-white/90">
                               Travel
                             </Badge>
                             
-                            {isOwnProfile && (
-                              <Button
-                                variant="ghost"
+                          {isOwnProfile && (
+                            <Button
+                              variant="ghost"
                                 size="icon"
                                 className="absolute top-3 left-3 h-8 w-8 rounded-full bg-white/80 hover:bg-white/90"
-                                onClick={() => handleDeleteExperience(exp.id)}
-                              >
-                                <X className="w-4 h-4" />
-                              </Button>
-                            )}
-                          </div>
+                              onClick={() => handleDeleteExperience(exp.id)}
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )}
+                        </div>
                           <div className="p-4">
                             <div>
                               <h3 className="font-semibold text-lg text-gray-900">{exp.title}</h3>
@@ -1589,94 +1760,65 @@ const ProfileComponent: React.FC = () => {
                             </div>
                             <div className="mt-4 flex justify-between items-center">
                               <div className="flex space-x-2">
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="px-2 h-8 text-gray-600 hover:text-hireyth-orange"
-                                  onClick={() => handleLikeExperience(exp.id, exp.is_liked)}
-                                >
-                                  <Heart className={`w-4 h-4 mr-1 ${exp.is_liked ? 'text-hireyth-orange fill-hireyth-orange' : 'text-gray-500'}`} />
-                                  <span>{exp.likes_count}</span>
-                                </Button>
-                                <Button 
-                                  variant="ghost" 
-                                  size="sm" 
-                                  className="px-2 h-8 text-gray-600 hover:text-hireyth-blue"
-                                  onClick={() => handleOpenComments(exp)}
-                                >
-                                  <MessageCircle className="w-4 h-4 mr-1" />
-                                  <span>{exp.comments_count}</span>
-                                </Button>
+                                <p className="text-xs text-gray-500">
+                                  {new Date(exp.created_at).toLocaleDateString('en-US', { 
+                                    month: 'short', 
+                                    day: 'numeric', 
+                                    year: 'numeric' 
+                                  })}
+                                </p>
                               </div>
-                              <p className="text-xs text-gray-500">
-                                {new Date(exp.created_at).toLocaleDateString('en-US', { 
-                                  month: 'short', 
-                                  day: 'numeric', 
-                                  year: 'numeric' 
-                                })}
-                              </p>
                             </div>
-                          </div>
-                        </div>
-                      ))}
+                      </div>
                     </div>
-                    {isOwnProfile && (
-                      <Button
-                        onClick={() => setShowAddExperience(true)}
-                        className="fixed bottom-24 right-6 h-12 w-12 rounded-full shadow-lg bg-hireyth-main hover:bg-hireyth-main/90 flex items-center justify-center p-0"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="lucide lucide-plus">
-                          <path d="M5 12h14" />
-                          <path d="M12 5v14" />
-                        </svg>
-                      </Button>
-                    )}
+                  ))}
+                </div>
                   </>
-                )}
-              </div>
+              )}
+            </div>
             )}
-            
+          
             {activeTab === 'created' && (
               <div>
-                {createdTrips.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">No trips created yet</p>
-                    {isOwnProfile && (
-                      <Button
-                        onClick={() => navigate('/create')}
-                        className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
-                      >
-                        Create Your First Trip
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {createdTrips.map(renderTripCard)}
-                  </div>
+            {createdTrips.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No trips created yet</p>
+                {isOwnProfile && (
+                  <Button
+                    onClick={() => navigate('/create')}
+                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                  >
+                    Create Your First Trip
+                  </Button>
                 )}
               </div>
+            ) : (
+                  <div className="space-y-4">
+                {createdTrips.map(renderTripCard)}
+              </div>
             )}
-            
+              </div>
+            )}
+          
             {activeTab === 'joined' && (
               <div>
-                {joinedTrips.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">No trips joined yet</p>
-                    {isOwnProfile && (
-                      <Button
-                        onClick={() => navigate('/trips')}
-                        className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
-                      >
-                        Explore Trips
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="grid gap-4 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
-                    {joinedTrips.map(renderTripCard)}
-                  </div>
+            {joinedTrips.length === 0 ? (
+              <div className="text-center py-8">
+                <p className="text-gray-600">No trips joined yet</p>
+                {isOwnProfile && (
+                  <Button
+                    onClick={() => navigate('/trips')}
+                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                  >
+                    Explore Trips
+                  </Button>
                 )}
+              </div>
+            ) : (
+                  <div className="space-y-4">
+                {joinedTrips.map(renderTripCard)}
+              </div>
+            )}
               </div>
             )}
           </div>
@@ -1698,89 +1840,10 @@ const ProfileComponent: React.FC = () => {
         {/* Following Dialog */}
         {renderFollowingDialog()}
         
-        {/* Comments Dialog */}
-        <Dialog open={showComments} onOpenChange={setShowComments}>
-          <DialogContent className="sm:max-w-md">
-            <DialogHeader>
-              <DialogTitle>
-                {currentExperience?.title && `Comments on "${currentExperience.title}"`}
-              </DialogTitle>
-            </DialogHeader>
-            
-            <div className="mt-4 space-y-4 max-h-[50vh] overflow-y-auto">
-              {loadingComments ? (
-                <div className="flex justify-center py-4">
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                </div>
-              ) : comments.length === 0 ? (
-                <p className="text-center text-gray-500 py-4">
-                  No comments yet. Be the first to comment!
-                </p>
-              ) : (
-                comments.map((comment) => (
-                  <div key={comment.id} className="bg-gray-50 rounded-lg p-3">
-                    <div className="flex gap-2">
-                      <Avatar className="h-8 w-8">
-                        <AvatarImage src={comment.user.profile_image} alt={comment.user.name} />
-                        <AvatarFallback>{comment.user.name[0]}</AvatarFallback>
-                      </Avatar>
-                      <div className="flex-1">
-                        <div className="flex justify-between">
-                          <p className="font-medium text-sm">{comment.user.name}</p>
-                          <p className="text-xs text-gray-500">
-                            {new Date(comment.created_at).toLocaleDateString('en-US', { 
-                              month: 'short', 
-                              day: 'numeric'
-                            })}
-                          </p>
-                        </div>
-                        <p className="text-sm mt-1">{comment.content}</p>
-                      </div>
-                    </div>
-                  </div>
-                ))
-              )}
-            </div>
-            
-            {user && (
-              <div className="flex items-center gap-2 mt-4">
-                <Avatar className="h-8 w-8">
-                  <AvatarImage 
-                    src={user.user_metadata?.avatar_url || profileData?.profile_image} 
-                    alt={user.user_metadata?.name || profileData?.name || 'User'} 
-                  />
-                  <AvatarFallback>
-                    {(user.user_metadata?.name || profileData?.name || 'U')[0]}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1 flex gap-2">
-                  <Input
-                    placeholder="Add a comment..."
-                    value={commentText}
-                    onChange={(e) => setCommentText(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleAddComment();
-                      }
-                    }}
-                  />
-                  <Button 
-                    onClick={handleAddComment}
-                    disabled={!commentText.trim()}
-                  >
-                    Post
-                  </Button>
-                </div>
-              </div>
-            )}
-          </DialogContent>
-        </Dialog>
-        
         <BottomNav />
       </div>
     </div>
   );
 };
 
-export default ProfileComponent;
+export default Profile;

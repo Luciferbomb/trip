@@ -3,12 +3,12 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, Link } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useNavigate, Link, useLocation } from "react-router-dom";
 import { useEffect, useState } from "react";
 import LandingPage from "./pages/LandingPage";
 import Login from "./pages/Login";
 import Trips from "./pages/Trips";
-import Profile from "./pages/Profile";
+import Profile from "./pages/ProfileExport";
 import CreateTrip from "./pages/CreateTrip";
 import TripDetails from "./pages/TripDetails";
 import NotFound from "./pages/NotFound";
@@ -31,6 +31,70 @@ import Navbar from '@/components/Navbar';
 import Notifications from '@/components/Notifications';
 import Experiences from './pages/Experiences';
 import BottomNav from '@/components/BottomNav';
+import { scrollToTop } from '@/lib/navigation-utils';
+import { AnimatePresence, motion } from 'framer-motion';
+
+// Error Boundary component to catch rendering errors
+interface ErrorBoundaryProps {
+  children: React.ReactNode;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+  errorInfo: React.ErrorInfo | null;
+}
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  constructor(props: ErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: Error): Partial<ErrorBoundaryState> {
+    // Update state so the next render will show the fallback UI
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo): void {
+    // You can also log the error to an error reporting service
+    console.error("Error caught by ErrorBoundary:", error, errorInfo);
+    this.setState({ errorInfo });
+  }
+
+  render() {
+    if (this.state.hasError) {
+      // You can render any custom fallback UI
+      return (
+        <div className="min-h-screen flex flex-col items-center justify-center p-4 bg-gray-50">
+          <div className="max-w-md w-full bg-white p-6 rounded-lg shadow-md">
+            <h1 className="text-xl font-bold text-red-600 mb-4">Something went wrong</h1>
+            <p className="mb-4 text-gray-700">
+              There was an error rendering the application. Please try refreshing the page.
+            </p>
+            <div className="mb-4">
+              <button 
+                onClick={() => window.location.reload()} 
+                className="px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600"
+              >
+                Refresh Page
+              </button>
+            </div>
+            <details className="mt-4 border border-gray-200 rounded p-2">
+              <summary className="cursor-pointer text-sm text-gray-600">Technical Details</summary>
+              <pre className="mt-2 text-xs bg-gray-100 p-2 rounded overflow-auto max-h-40">
+                {this.state.error?.toString()}
+                {this.state.errorInfo?.componentStack}
+              </pre>
+            </details>
+          </div>
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 // Add the Google Fonts link for Dancing Script font
 // This would typically go in the index.html file, but for now we'll add it here
@@ -190,9 +254,25 @@ const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
+// Page transition component
+const PageTransition = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      exit={{ opacity: 0 }}
+      transition={{ duration: 0.3 }}
+    >
+      {children}
+    </motion.div>
+  );
+};
+
 const AppRoutes = () => {
   const [isDbInitialized, setIsDbInitialized] = useState(false);
   const [dbError, setDbError] = useState<string | null>(null);
+  const { user, loading } = useAuth();
+  const location = useLocation();
   
   useEffect(() => {
     const initDb = async () => {
@@ -211,6 +291,23 @@ const AppRoutes = () => {
     initDb();
   }, []);
 
+  useEffect(() => {
+    // Scroll to top on route changes
+    const handleRouteChange = () => {
+      scrollToTop(false);
+    };
+    
+    // Handle initial page load
+    handleRouteChange();
+    
+    // Add event listener
+    window.addEventListener('popstate', handleRouteChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleRouteChange);
+    };
+  }, []);
+
   return (
     <div className="min-h-screen bg-gray-50">
       {dbError && (
@@ -226,31 +323,127 @@ const AppRoutes = () => {
         </div>
       )}
       <div className="flex-grow px-4 pt-4">
-        <Routes>
-          <Route path="/" element={
-            <AuthRoute>
-              <Feed />
-            </AuthRoute>
-          } />
-          <Route path="/login" element={<Login />} />
-          <Route path="/signup" element={<SignUp />} />
-          <Route path="/reset-password" element={<ResetPassword />} />
-          <Route path="/onboarding" element={<OnboardingRoute><Onboarding /></OnboardingRoute>} />
-          <Route path="/trips" element={<ProtectedRoute><Trips /></ProtectedRoute>} />
-          <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/profile/:username" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
-          <Route path="/create" element={<ProtectedRoute><CreateTrip /></ProtectedRoute>} />
-          <Route path="/trips/:id" element={<ProtectedRoute><TripDetails /></ProtectedRoute>} />
-          <Route path="/trips/:id/edit" element={<ProtectedRoute><EditTrip /></ProtectedRoute>} />
-          <Route path="/experiences" element={<ProtectedRoute><Experiences /></ProtectedRoute>} />
-          <Route path="/explore" element={<ProtectedRoute><Explore /></ProtectedRoute>} />
-          <Route path="/about" element={<About />} />
-          <Route path="/terms" element={<Terms />} />
-          <Route path="/privacy" element={<Privacy />} />
-          <Route path="/contact" element={<Contact />} />
-          <Route path="/search" element={<ProtectedRoute><Search /></ProtectedRoute>} />
-          <Route path="*" element={<NotFound />} />
-        </Routes>
+        <AnimatePresence mode="wait">
+          <Routes location={location} key={location.pathname}>
+            <Route path="/" element={
+              <AuthRoute>
+                <PageTransition>
+                  <Feed />
+                </PageTransition>
+              </AuthRoute>
+            } />
+            <Route path="/login" element={
+              <PageTransition>
+                <Login />
+              </PageTransition>
+            } />
+            <Route path="/signup" element={
+              <PageTransition>
+                <SignUp />
+              </PageTransition>
+            } />
+            <Route path="/reset-password" element={
+              <PageTransition>
+                <ResetPassword />
+              </PageTransition>
+            } />
+            <Route path="/onboarding" element={
+              <OnboardingRoute>
+                <PageTransition>
+                  <Onboarding />
+                </PageTransition>
+              </OnboardingRoute>
+            } />
+            <Route path="/trips" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Trips />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Profile />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/profile/:username" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Profile />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/create" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <CreateTrip />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/trips/:id" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <TripDetails />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/trips/:id/edit" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <EditTrip />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/experiences" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Experiences />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/explore" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Explore />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="/about" element={
+              <PageTransition>
+                <About />
+              </PageTransition>
+            } />
+            <Route path="/terms" element={
+              <PageTransition>
+                <Terms />
+              </PageTransition>
+            } />
+            <Route path="/privacy" element={
+              <PageTransition>
+                <Privacy />
+              </PageTransition>
+            } />
+            <Route path="/contact" element={
+              <PageTransition>
+                <Contact />
+              </PageTransition>
+            } />
+            <Route path="/search" element={
+              <ProtectedRoute>
+                <PageTransition>
+                  <Search />
+                </PageTransition>
+              </ProtectedRoute>
+            } />
+            <Route path="*" element={
+              <PageTransition>
+                <NotFound />
+              </PageTransition>
+            } />
+          </Routes>
+        </AnimatePresence>
       </div>
     </div>
   );
@@ -280,7 +473,9 @@ const App = () => {
         <Sonner />
         <AuthProvider>
           <BrowserRouter>
-            <AppContent />
+            <ErrorBoundary>
+              <AppContent />
+            </ErrorBoundary>
           </BrowserRouter>
         </AuthProvider>
       </TooltipProvider>

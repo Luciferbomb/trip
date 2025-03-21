@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { Home, Search as SearchIcon, PlusCircle, User, Map, MessageCircle } from 'lucide-react';
+import { Home, Search as SearchIcon, PlusCircle, User, Map } from 'lucide-react';
 
 const Navbar: React.FC = () => {
   const location = useLocation();
@@ -41,18 +41,6 @@ const Navbar: React.FC = () => {
               <PlusCircle className="w-6 h-6" />
             </div>
             <span className="text-xs mt-1 font-medium text-gray-700">Create</span>
-          </Link>
-          
-          <Link 
-            to="/experiences" 
-            className={`flex flex-col items-center justify-center p-2 rounded-lg transition-colors ${
-              location.pathname === '/experiences' 
-                ? 'text-hireyth-main bg-hireyth-lightest-blue' 
-                : 'text-gray-500 hover:bg-gray-50'
-            }`}
-          >
-            <MessageCircle className="w-5 h-5" />
-            <span className="text-xs mt-1 font-medium">Experiences</span>
           </Link>
           
           <Link 

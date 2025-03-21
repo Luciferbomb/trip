@@ -130,9 +130,12 @@ const Trips = () => {
       startDate: trip.start_date || trip.startDate,
       endDate: trip.end_date || trip.endDate,
       spots: trip.spots,
+      spotsFilled: trip.spots_filled || 0,
       creatorImage: trip.creator_image || trip.creatorImage,
       creatorName: trip.creator_name || trip.creatorName,
       creatorId: trip.creator_id || trip.creatorId,
+      activity: trip.activity,
+      country: trip.country,
       featured: trip.featured
     };
   };
