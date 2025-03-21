@@ -14,8 +14,8 @@ import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { TravelDestinationCard } from '@/components/TravelDestinationCard.tsx';
-import { TravelTestimonials } from '@/components/TravelTestimonials.tsx';
+import { TravelDestinationCard } from '../components/TravelDestinationCard';
+import { TravelTestimonials } from '../components/TravelTestimonials';
 import { BottomNav } from '@/components/BottomNav';
 
 interface Profile {
