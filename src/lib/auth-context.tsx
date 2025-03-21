@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { supabase, getEmailRedirectUrl } from './supabase';
 
 // Define the shape of the auth context
 type AuthContextType = {
@@ -13,52 +13,61 @@ type AuthContextType = {
   resetPassword: (email: string) => Promise<{ error: any | null }>;
 };
 
-// Create the auth context with default values
-const AuthContext = createContext<AuthContextType>({
-  session: null,
-  user: null,
-  loading: true,
-  signIn: async () => ({ error: null }),
-  signUp: async () => ({ error: null, user: null }),
-  signOut: async () => {},
-  resetPassword: async () => ({ error: null }),
-});
+// Create the auth context
+const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 // Custom hook to use the auth context
-export const useAuth = () => useContext(AuthContext);
+export const useAuth = () => {
+  const context = useContext(AuthContext);
+  if (context === undefined) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+  return context;
+};
 
 // Auth provider component
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [loading, setLoading] = useState(true);
 
+  // Initialize auth state from Supabase on mount
   useEffect(() => {
-    // Get the current session when the component mounts
+    // Get initial session
     const getSession = async () => {
-      const { data: { session }, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('Error getting session:', error);
-      }
-      
-      setSession(session);
-      setUser(session?.user || null);
-      setLoading(false);
-    };
-
-    getSession();
-
-    // Set up a listener for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
-        setSession(session);
-        setUser(session?.user || null);
+      try {
+        setLoading(true);
+        
+        const { data, error } = await supabase.auth.getSession();
+        
+        if (error) {
+          console.error('Error getting session:', error);
+          return;
+        }
+        
+        if (data.session) {
+          setSession(data.session);
+          setUser(data.session.user);
+        }
+      } catch (error) {
+        console.error('Unexpected error:', error);
+      } finally {
         setLoading(false);
       }
+    };
+    
+    getSession();
+    
+    // Set up auth state change listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log("Auth state changed:", event);
+        setSession(session);
+        setUser(session?.user ?? null);
+      }
     );
-
-    // Clean up the subscription when the component unmounts
+    
+    // Clean up subscription on unmount
     return () => {
       subscription.unsubscribe();
     };
@@ -67,59 +76,60 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signInWithPassword({
+      setLoading(true);
+      
+      const { data, error } = await supabase.auth.signInWithPassword({
         email,
-        password,
+        password
       });
       
+      if (error) {
+        return { error };
+      }
+      
+      setSession(data.session);
+      setUser(data.user);
+      
+      return { error: null };
+    } catch (error: any) {
+      console.error('Sign-in error:', error);
       return { error };
-    } catch (error) {
-      console.error('Error signing in:', error);
-      return { error };
+    } finally {
+      setLoading(false);
     }
   };
 
   // Sign up with email and password
   const signUp = async (email: string, password: string, userData: any) => {
     try {
-      // Create the user in Supabase Auth first
+      setLoading(true);
+      
+      // Create the user in Supabase Auth
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: {
-            name: userData.name,
-            username: userData.username
-          },
-        },
+          data: userData,
+          emailRedirectTo: getEmailRedirectUrl()
+        }
       });
       
       if (authError) {
-        if (authError.message?.includes('already registered')) {
-          return { error: { message: 'Email is already registered' }, user: null };
-        }
         return { error: authError, user: null };
       }
       
       if (!authData.user) {
         return { error: { message: 'No user data returned from auth signup' }, user: null };
       }
-
-      // Wait for auth to complete
-      await new Promise(resolve => setTimeout(resolve, 1500));
-
+      
       try {
-        // Create user profile
+        // Create the user profile in the database
         const { error: profileError } = await supabase
           .from('users')
           .insert({
             id: authData.user.id,
-            name: userData.name,
-            username: userData.username,
             email: email,
-            profile_image: 'https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=200&q=80',
-            followers_count: 0,
-            following_count: 0,
+            username: email.split('@')[0], // Generate username from email as default
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString(),
             onboarding_completed: false

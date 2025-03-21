@@ -1,7 +1,7 @@
 import * as React from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
-import { Home, Compass, Map, User } from "lucide-react"
+import { Home, Compass, Map } from "lucide-react"
 
 interface NavItem {
   icon: React.ReactNode
@@ -20,6 +20,11 @@ export function BottomNav({ className }: BottomNavProps) {
 
   const navItems: NavItem[] = [
     {
+      icon: <Home size={20} />,
+      label: "Home",
+      path: "/",
+    },
+    {
       icon: <Compass size={20} />,
       label: "Explore",
       path: "/explore",
@@ -28,11 +33,6 @@ export function BottomNav({ className }: BottomNavProps) {
       icon: <Map size={20} />,
       label: "Trips",
       path: "/trips",
-    },
-    {
-      icon: <User size={20} />,
-      label: "Profile",
-      path: "/profile",
     },
   ]
 

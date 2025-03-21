@@ -81,21 +81,6 @@ const Header = () => {
               Hireyth
             </button>
 
-            {/* Search Bar - Hidden on mobile */}
-            <form 
-              onSubmit={handleSearch}
-              className="hidden md:flex flex-1 max-w-md mx-4"
-            >
-              <div className="relative w-full">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
-                <Input
-                  name="search"
-                  placeholder="Search destinations, trips, or people..."
-                  className="w-full pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/60 focus:bg-white/10"
-                />
-              </div>
-            </form>
-
             {/* Navigation */}
             <div className="flex items-center gap-2">
               {user ? (
@@ -178,16 +163,30 @@ const Header = () => {
       {isMobileMenuOpen && (
         <div className="md:hidden bg-white/10 backdrop-blur-md border-b border-white/20">
           <div className="container mx-auto px-4 py-4">
-            <form onSubmit={handleSearch} className="mb-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
-                <Input
-                  name="search"
-                  placeholder="Search..."
-                  className="w-full pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/60 focus:bg-white/10"
-                />
+            {user && (
+              <div className="mb-4">
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/profile')}
+                  className="w-full flex items-center justify-start text-white/80 hover:text-white hover:bg-white/10"
+                >
+                  <User className="mr-2 h-4 w-4" />
+                  Profile
+                </Button>
               </div>
-            </form>
+            )}
+            {!user && (
+              <form onSubmit={handleSearch} className="mb-4">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-white/60" />
+                  <Input
+                    name="search"
+                    placeholder="Search..."
+                    className="w-full pl-10 bg-white/5 border-white/10 text-white placeholder:text-white/60 focus:bg-white/10"
+                  />
+                </div>
+              </form>
+            )}
           </div>
         </div>
       )}
