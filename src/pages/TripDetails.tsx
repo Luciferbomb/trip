@@ -278,15 +278,19 @@ const TripDetails = () => {
   const handleShare = () => {
     if (navigator.share) {
       navigator.share({
-        title: trip?.title,
-        text: `Check out this trip: ${trip?.title}`,
+        title: `${trip?.title} - Hireyth`,
+        text: `Join me on this amazing trip to ${trip?.location}!`,
         url: window.location.href,
       }).catch(err => {
         console.error('Error sharing:', err);
       });
     } else {
       // Fallback for browsers that don't support the Web Share API
-      alert('Share link copied to clipboard!');
+      navigator.clipboard.writeText(window.location.href);
+      toast({
+        title: "Link copied!",
+        description: "Trip link has been copied to your clipboard"
+      });
     }
   };
   
