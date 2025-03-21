@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase, getEmailRedirectUrl } from './supabase';
+import { supabase } from './supabase';
+
+// Define the getEmailRedirectUrl function directly in this file
+const getEmailRedirectUrl = () => {
+  return `${window.location.origin}/email-confirmation`;
+};
 
 // Define the shape of the auth context
 type AuthContextType = {
