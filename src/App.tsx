@@ -7,7 +7,7 @@
  * - Updated to use runMigrations from ./lib/migrations instead of ./lib/migration
  * - Added local scrollToTop implementation instead of importing from utils
  * - Updated the Feed import to use the component from ./components/Feed
- * - Installed react-hot-toast package for toast notifications
+ * - Using custom ToastProvider instead of react-hot-toast package
  */
 
 import React, { useState, useEffect } from 'react';
@@ -19,7 +19,8 @@ import { supabase } from './lib/supabase';
 import runMigrations from './lib/migrations';
 import { cn } from './lib/utils';
 import { AuthProvider, useAuth } from './lib/auth-context';
-import { Toaster } from 'react-hot-toast';
+// import { Toaster } from 'react-hot-toast';
+import ToastProvider from './components/ToastProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppHeader from '@/components/AppHeader';
 import DesktopRestriction from './components/DesktopRestriction';
@@ -480,16 +481,18 @@ const AppContent = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <Toaster />
-      <AuthProvider>
-        <Router>
-          <ErrorBoundary>
-            <DesktopRestriction>
-              <AppContent />
-            </DesktopRestriction>
-          </ErrorBoundary>
-        </Router>
-      </AuthProvider>
+      {/* <Toaster /> */}
+      <ToastProvider>
+        <AuthProvider>
+          <Router>
+            <ErrorBoundary>
+              <DesktopRestriction>
+                <AppContent />
+              </DesktopRestriction>
+            </ErrorBoundary>
+          </Router>
+        </AuthProvider>
+      </ToastProvider>
     </QueryClientProvider>
   );
 };
