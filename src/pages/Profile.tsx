@@ -953,35 +953,34 @@ const Profile = () => {
     return (
       <div key={trip.id} className="relative group">
         <Link to={`/trips/${trip.id}`} className="block">
-          <div className="bg-white rounded-xl border border-gray-200 overflow-hidden transition-all duration-300 hover:shadow-lg">
-            <div className="relative aspect-[16/9] overflow-hidden">
+          <div className="modern-card bg-white overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-100">
+            <div className="relative aspect-[16/9] overflow-hidden gradient-overlay">
               <img
                 src={trip.image_url}
                 alt={trip.title}
-                className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
               
               {/* Creator Info - Overlaid on image */}
-              <div className="absolute bottom-4 left-4 flex items-center">
+              <div className="absolute bottom-4 left-4 flex items-center z-10">
                 <img
                   src={trip.creator_image}
                   alt={trip.creator_name}
-                  className="w-8 h-8 rounded-full border-2 border-white object-cover"
+                  className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-md"
                 />
                 <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
               </div>
             </div>
             
             <div className="p-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">{trip.title}</h3>
+              <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{trip.title}</h3>
               <div className="flex items-center text-gray-600 mb-2">
-                <MapPin className="w-4 h-4 mr-1" />
+                <MapPin className="w-4 h-4 mr-1 text-blue-500" />
                 <span>{trip.location}</span>
               </div>
               
               <div className="flex items-center text-gray-600">
-                <Calendar className="w-4 h-4 mr-1" />
+                <Calendar className="w-4 h-4 mr-1 text-blue-500" />
                 <span className="text-sm">
                   {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
                 </span>
@@ -989,7 +988,7 @@ const Profile = () => {
               
               {trip.status && (
                 <div className="mt-2">
-                  <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'}>
+                  <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'} className="pill-badge">
                     {trip.status}
                   </Badge>
                 </div>
@@ -999,11 +998,11 @@ const Profile = () => {
         </Link>
         
         {isOwner && (
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity">
+          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
             <Button
               variant="destructive"
               size="sm"
-              className="bg-red-500/90 hover:bg-red-600"
+              className="bg-red-500/90 hover:bg-red-600 rounded-full h-8 w-8 p-0"
               onClick={(e) => handleDeleteTrip(trip.id, e)}
             >
               <Trash2 className="w-4 h-4" />
@@ -1017,28 +1016,28 @@ const Profile = () => {
   // Update the followers dialog content
   const renderFollowersDialog = () => (
     <Dialog open={showFollowers} onOpenChange={setShowFollowers}>
-      <DialogContent>
+      <DialogContent className="glassmorphism-card max-w-md">
         <DialogHeader>
-          <DialogTitle>Followers ({followers.length})</DialogTitle>
+          <DialogTitle className="gradient-text text-center text-xl">Followers ({followers.length})</DialogTitle>
         </DialogHeader>
         <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {loadingFollowers ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
             </div>
           ) : followers.length === 0 ? (
             <p className="text-center text-gray-500">No followers yet</p>
           ) : (
             followers.map((follower) => (
-            <div key={follower.id} className="flex items-center justify-between">
+            <div key={follower.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-blue-50 transition-colors">
               <Link 
                 to={`/profile/${follower.username}`}
                 className="flex items-center space-x-3"
                 onClick={() => setShowFollowers(false)}
               >
-                  <Avatar>
+                  <Avatar className="border-2 border-white shadow-sm">
                     <AvatarImage src={follower.profile_image} alt={follower.name} />
-                    <AvatarFallback>{follower.name[0]}</AvatarFallback>
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-indigo-500 text-white">{follower.name[0]}</AvatarFallback>
                   </Avatar>
                 <div>
                   <p className="font-medium">{follower.name}</p>
@@ -1056,14 +1055,14 @@ const Profile = () => {
   // Update the following dialog content
   const renderFollowingDialog = () => (
     <Dialog open={showFollowing} onOpenChange={setShowFollowing}>
-      <DialogContent>
+      <DialogContent className="glassmorphism-card max-w-md">
         <DialogHeader>
-          <DialogTitle>Following ({following.length})</DialogTitle>
+          <DialogTitle className="gradient-text text-center text-xl">Following ({following.length})</DialogTitle>
         </DialogHeader>
         <div className="mt-4 space-y-4 max-h-[60vh] overflow-y-auto">
           {loadingFollowing ? (
             <div className="flex justify-center py-4">
-              <Loader2 className="w-6 h-6 animate-spin" />
+              <Loader2 className="w-6 h-6 animate-spin text-blue-500" />
             </div>
           ) : following.length === 0 ? (
             <p className="text-center text-gray-500">Not following anyone yet</p>
@@ -1361,7 +1360,7 @@ const Profile = () => {
   if (error) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="bg-red-50 border border-red-200 p-6 rounded-lg shadow-sm max-w-lg w-full">
+        <div className="glassmorphism-card max-w-lg w-full bg-white/95">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-red-800 mb-2">Error</h3>
           <p className="text-red-700 mb-6">{error}</p>
@@ -1369,7 +1368,7 @@ const Profile = () => {
             <Button 
               variant="outline" 
               onClick={() => window.location.reload()}
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 modern-focus"
             >
               <RefreshCw className="h-4 w-4" />
               Refresh Page
@@ -1377,6 +1376,7 @@ const Profile = () => {
             
             {error.includes('Database setup') && (
               <Button 
+                variant="sleek"
                 onClick={async () => {
                   try {
                     setLoading(true);
@@ -1421,13 +1421,13 @@ const Profile = () => {
   if (!profileData) {
     return (
       <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="bg-gray-50 border border-gray-200 p-6 rounded-lg shadow-sm max-w-lg w-full">
+        <div className="glassmorphism-card max-w-lg w-full bg-white/95">
           <UserX className="h-12 w-12 text-gray-500 mx-auto mb-4" />
           <h3 className="text-lg font-bold text-gray-800 mb-2">Profile not found</h3>
           <p className="text-gray-600 mb-6">The profile you're looking for doesn't exist.</p>
           <Link 
             to="/" 
-            className="inline-flex items-center gap-2 px-4 py-2 bg-hireyth-main text-white rounded-md hover:bg-hireyth-dark transition-colors"
+            className="inline-flex items-center gap-2 px-4 py-2 sleek-button rounded-md hover:shadow-lg transition-all duration-300"
           >
             <Home className="h-4 w-4" />
             Go Home
@@ -1441,8 +1441,11 @@ const Profile = () => {
     return (
       <div className="min-h-screen bg-gray-50">
         <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)]">
-          <Loader2 className="w-8 h-8 animate-spin text-hireyth-main mb-4" />
-          <p className="text-gray-600">Loading profile...</p>
+          <div className="relative">
+            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
+            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" />
+          </div>
+          <p className="text-gray-600 mt-4 font-medium">Loading profile...</p>
         </div>
       </div>
     );
@@ -1457,16 +1460,17 @@ const Profile = () => {
         <div className="mb-8">
           <div className="relative mb-20 sm:mb-24">
             {/* Cover Image with Map Background */}
-            <div className="h-48 sm:h-64 rounded-xl overflow-hidden shadow-sm relative">
+            <div className="h-48 sm:h-64 rounded-xl overflow-hidden shadow-md relative">
               {profileData && (
                 <div className="absolute inset-0 w-full h-full">
                   <ProfileMapBackground userId={profileData.id} />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
                 </div>
               )}
             </div>
             
             {/* Profile Image */}
-            <div className="absolute -bottom-16 sm:-bottom-20 left-1/2 -translate-x-1/2 shadow-md rounded-full border-4 border-white bg-white z-10">
+            <div className="absolute -bottom-16 sm:-bottom-20 left-1/2 -translate-x-1/2 shadow-xl rounded-full border-4 border-white bg-white z-10 transition-transform duration-500 hover:scale-105">
               <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-white">
               <img
                 src={profileData?.profile_image}
@@ -1484,11 +1488,11 @@ const Profile = () => {
               <Input
                 value={editForm.name || ''}
                 onChange={(e) => handleInputChange('name', e.target.value)}
-                className="font-bold text-xl mb-1 text-center"
+                className="font-bold text-xl mb-1 text-center modern-focus"
                 placeholder="Your name"
               />
             ) : (
-              <h1 className="text-2xl font-bold mb-1">{profileData?.name}</h1>
+              <h1 className="text-2xl font-bold mb-1 gradient-text">{profileData?.name}</h1>
             )}
             
             <p className="text-gray-500 mb-3">@{profileData?.username}</p>
@@ -1498,12 +1502,12 @@ const Profile = () => {
                 <Input
                   value={editForm.location || ''}
                   onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="mt-2 max-w-xs mx-auto"
+                  className="mt-2 max-w-xs mx-auto modern-focus"
                   placeholder="Add your location"
                 />
               ) : profileData?.location && (
                 <div className="flex items-center">
-                  <MapPin size={14} className="mr-1" />
+                  <MapPin size={14} className="mr-1 text-blue-500" />
                   <span>{profileData.location}</span>
                 </div>
               )}
@@ -1517,7 +1521,7 @@ const Profile = () => {
                   value={editForm.bio || ''}
                   onChange={(e) => handleInputChange('bio', e.target.value)}
                   placeholder="Write something about yourself..."
-                  className="resize-none h-24"
+                  className="resize-none h-24 modern-focus"
                 />
                 <p className="text-xs text-gray-500 mt-1">
                   Share a little about yourself, your interests, and your travel style.
@@ -1525,19 +1529,19 @@ const Profile = () => {
               </div>
             ) : profileData?.bio ? (
               <div className="max-w-lg mx-auto mb-6 mt-3">
-                <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20 relative">
-                  <div className="absolute -top-3 left-4 bg-blue-100 rounded-full p-1.5">
-                    <User className="h-4 w-4 text-blue-600" />
+                <div className="glassmorphism-card bg-white hover:shadow-lg transition-all duration-300">
+                  <div className="absolute -top-3 left-4 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full p-1.5 shadow-md">
+                    <User className="h-4 w-4 text-white" />
                   </div>
-                  <h4 className="text-sm font-medium text-white/90 mb-2 pl-1">About</h4>
-                  <p className="text-white/80 text-sm leading-relaxed whitespace-pre-line pl-1">{profileData.bio}</p>
+                  <h4 className="text-sm font-medium text-gray-700 mb-2 pl-1">About</h4>
+                  <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line pl-1">{profileData.bio}</p>
                 </div>
               </div>
             ) : isOwnProfile ? (
               <div className="max-w-lg mx-auto mb-6 mt-3">
                 <Button 
-                  variant="ghost" 
-                  className="text-white/70 hover:text-white hover:bg-white/10 flex items-center text-sm"
+                  variant="modern-outline" 
+                  className="text-gray-500 hover:text-blue-600 flex items-center text-sm"
                   onClick={() => setIsEditMode(true)}
                 >
                   <PlusCircle className="h-4 w-4 mr-2" />
@@ -1548,28 +1552,28 @@ const Profile = () => {
             
             {/* Stats */}
             <div className="flex justify-center space-x-6 mb-6">
-              <div className="text-center">
-                <div className="font-bold">{experiences.length}</div>
+              <div className="text-center stat-counter">
+                <div className="font-bold text-blue-600">{experiences.length}</div>
                 <div className="text-xs text-gray-500">Experiences</div>
               </div>
               <button
-                className="text-center"
+                className="text-center stat-counter"
                 onClick={() => {
                   setShowFollowers(true);
                   fetchFollowers();
                 }}
               >
-                <div className="font-bold">{profileData?.followers_count ?? 0}</div>
+                <div className="font-bold text-blue-600">{profileData?.followers_count ?? 0}</div>
                 <div className="text-xs text-gray-500">Followers</div>
               </button>
               <button
-                className="text-center"
+                className="text-center stat-counter"
                 onClick={() => {
                   setShowFollowing(true);
                   fetchFollowing();
                 }}
               >
-                <div className="font-bold">{profileData?.following_count ?? 0}</div>
+                <div className="font-bold text-blue-600">{profileData?.following_count ?? 0}</div>
                 <div className="text-xs text-gray-500">Following</div>
               </button>
             </div>
@@ -1587,6 +1591,7 @@ const Profile = () => {
                     value={editForm.instagram || ''}
                     onChange={(e) => handleInputChange('instagram', e.target.value)}
                     placeholder="Instagram username (without @)"
+                    className="modern-focus"
                   />
                 </div>
                 <div className="flex items-center">
@@ -1599,6 +1604,7 @@ const Profile = () => {
                     value={editForm.linkedin || ''}
                     onChange={(e) => handleInputChange('linkedin', e.target.value)}
                     placeholder="LinkedIn username"
+                    className="modern-focus"
                   />
                 </div>
               </div>
@@ -1612,7 +1618,7 @@ const Profile = () => {
             <div className="flex justify-center space-x-3 mb-8">
               {isOwnProfile ? (
                 <Button
-                  variant={isEditMode ? "default" : "outline"}
+                  variant={isEditMode ? "modern" : "modern-outline"}
                   size="sm"
                   onClick={() => {
                     if (isEditMode) {
@@ -1640,7 +1646,7 @@ const Profile = () => {
                 </Button>
               ) : (
                 <Button
-                  variant={isFollowing ? "outline" : "default"}
+                  variant={isFollowing ? "modern-outline" : "modern"}
                   size="sm"
                   onClick={handleFollow}
                   disabled={followLoading}
@@ -1674,46 +1680,46 @@ const Profile = () => {
                 </Button>
               )}
               </div>
-                </div>
+            </div>
         </div>
         
         {/* Tabs */}
         <div className="mb-6">
-          <div className="flex justify-center border-b border-gray-200 mb-6">
-                <button
-              className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+          <div className="modern-tabs bg-white rounded-lg shadow-sm mb-6 border border-gray-100 p-0.5">
+            <button
+              className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
                 activeTab === 'experiences' 
-                  ? 'border-hireyth-main text-hireyth-main' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'modern-tab-active bg-blue-50 text-blue-600' 
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
               onClick={() => setActiveTab('experiences')}
             >
-              <Grid className="w-4 h-4 mr-2" />
+              <Grid className={`w-4 h-4 mr-2 ${activeTab === 'experiences' ? 'text-blue-500' : ''}`} />
               <span>Experiences</span>
-                </button>
-                <button
-              className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+            </button>
+            <button
+              className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
                 activeTab === 'created' 
-                  ? 'border-hireyth-main text-hireyth-main' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'modern-tab-active bg-blue-50 text-blue-600' 
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
               onClick={() => setActiveTab('created')}
             >
-              <MapIcon className="w-4 h-4 mr-2" />
+              <MapIcon className={`w-4 h-4 mr-2 ${activeTab === 'created' ? 'text-blue-500' : ''}`} />
               <span>Created</span>
-                </button>
+            </button>
             <button
-              className={`flex items-center px-4 py-3 text-sm font-medium border-b-2 -mb-px transition-all ${
+              className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
                 activeTab === 'joined' 
-                  ? 'border-hireyth-main text-hireyth-main' 
-                  : 'border-transparent text-gray-500 hover:text-gray-700'
+                  ? 'modern-tab-active bg-blue-50 text-blue-600' 
+                  : 'text-gray-500 hover:text-gray-700'
               }`}
               onClick={() => setActiveTab('joined')}
             >
-              <Bookmark className="w-4 h-4 mr-2" />
+              <Bookmark className={`w-4 h-4 mr-2 ${activeTab === 'joined' ? 'text-blue-500' : ''}`} />
               <span>Joined</span>
             </button>
-        </div>
+          </div>
         
           {/* Tab Content */}
           <div>
@@ -1725,7 +1731,7 @@ const Profile = () => {
                     {isOwnProfile && (
                       <Button
                         onClick={() => setShowAddExperience(true)}
-                        className="mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                        className="mt-4 sleek-button"
                       >
                         Add Your First Experience
                       </Button>
@@ -1737,7 +1743,7 @@ const Profile = () => {
                       <div className="flex justify-end mb-6">
                         <Button
                           onClick={() => setShowAddExperience(true)}
-                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                          variant="sleek"
                         >
                           Share Experience
                         </Button>
@@ -1745,8 +1751,8 @@ const Profile = () => {
                     )}
                     <div className="space-y-6">
                   {experiences.map((exp: Experience) => (
-                        <div key={exp.id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow duration-300">
-                          <div className="relative">
+                       <div key={exp.id} className="modern-card bg-white">
+                          <div className="relative gradient-overlay">
                             {exp.image_url ? (
                         <img
                           src={exp.image_url}
@@ -1762,7 +1768,7 @@ const Profile = () => {
                           </div>
                             )}
                             
-                            <Badge className="absolute top-3 right-3 bg-white/80 text-gray-800 hover:bg-white/90">
+                            <Badge className="absolute top-3 right-3 pill-badge bg-white/80 text-gray-800 hover:bg-white/90 z-10">
                               Travel
                             </Badge>
                             
@@ -1770,7 +1776,7 @@ const Profile = () => {
                             <Button
                               variant="ghost"
                                 size="icon"
-                                className="absolute top-3 left-3 h-8 w-8 rounded-full bg-white/80 hover:bg-white/90"
+                                className="absolute top-3 left-3 h-8 w-8 rounded-full bg-white/80 hover:bg-white/90 z-10"
                               onClick={() => handleDeleteExperience(exp.id)}
                             >
                               <X className="w-4 h-4" />
@@ -1781,7 +1787,7 @@ const Profile = () => {
                             <div>
                               <h3 className="font-semibold text-lg text-gray-900">{exp.title}</h3>
                               <p className="text-gray-600 flex items-center mt-1">
-                                <MapPin className="h-4 w-4 mr-1" /> {exp.location}
+                                <MapPin className="h-4 w-4 mr-1 text-blue-500" /> {exp.location}
                               </p>
                             </div>
                             <div 
@@ -1821,14 +1827,14 @@ const Profile = () => {
                 {isOwnProfile && (
                   <Button
                     onClick={() => navigate('/create')}
-                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                    className="mt-4 sleek-button"
                   >
                     Create Your First Trip
                   </Button>
                 )}
               </div>
             ) : (
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {createdTrips.map(renderTripCard)}
               </div>
             )}
@@ -1843,14 +1849,14 @@ const Profile = () => {
                 {isOwnProfile && (
                   <Button
                     onClick={() => navigate('/trips')}
-                    className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
+                    className="mt-4 sleek-button"
                   >
                     Explore Trips
                   </Button>
                 )}
               </div>
             ) : (
-                  <div className="space-y-4">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {joinedTrips.map(renderTripCard)}
               </div>
             )}

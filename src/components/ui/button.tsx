@@ -22,6 +22,11 @@ const buttonVariants = cva(
         gradient: "bg-gradient-to-r from-[hsl(215.3,19.3%,34.5%)] to-[hsl(215.3,19.3%,44.5%)] text-white hover:from-[hsl(215.3,19.3%,30.5%)] hover:to-[hsl(215.3,19.3%,40.5%)] shadow-md",
         soft: "bg-secondary/60 text-primary hover:bg-secondary/80 shadow-sm",
         blue: "bg-[hsl(215.3,19.3%,34.5%)] text-white hover:bg-[hsl(215.3,19.3%,30.5%)] shadow-sm",
+        glass: "bg-white/20 backdrop-blur-md border border-white/30 text-white hover:bg-white/30 transition-all duration-300 shadow-sm",
+        "glass-dark": "bg-slate-800/70 backdrop-blur-md border border-slate-700/50 text-white hover:bg-slate-800/90 transition-all duration-300 shadow-sm",
+        modern: "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md transition-all duration-300",
+        "modern-outline": "border-2 border-blue-500 text-blue-600 hover:bg-blue-50 transition-all duration-300",
+        sleek: "relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all duration-300 after:absolute after:inset-0 after:z-[-1] after:opacity-0 after:bg-gradient-to-r after:from-indigo-600 after:to-blue-600 hover:after:opacity-100 after:transition-opacity after:duration-500",
       },
       size: {
         default: "h-10 px-4 py-2",
