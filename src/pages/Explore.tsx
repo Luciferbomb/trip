@@ -12,7 +12,7 @@ import debounce from 'lodash/debounce';
 import { useInfiniteQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
-import { TravelDestinationCard } from '@/components/TravelDestinationCard';
+import { TravelDestinationCard } from '@/components/TravelDestinationCard.tsx';
 
 // Safe import of useInView with fallback
 let useInViewImported;
