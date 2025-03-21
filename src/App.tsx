@@ -1,38 +1,64 @@
-import React from "react";
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as Sonner } from "@/components/ui/sonner";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, Routes, Route, Navigate, useNavigate, Link, useLocation } from "react-router-dom";
-import { useEffect, useState } from "react";
-import LandingPage from "./pages/LandingPage";
-import Login from "./pages/Login";
-import Trips from "./pages/Trips";
-import Profile from "./pages/ProfileExport";
-import CreateTrip from "./pages/CreateTrip";
-import TripDetails from "./pages/TripDetails";
-import NotFound from "./pages/NotFound";
-import runMigrations from './lib/migrations';
-import AuthProvider, { useAuth } from './lib/auth-context';
-import SignUp from "./pages/SignUp";
-import ResetPassword from "./pages/ResetPassword";
-import Footer from "./components/Footer";
-import About from "./pages/About";
-import Terms from "./pages/Terms";
-import Privacy from "./pages/Privacy";
-import Contact from "./pages/Contact";
-import Explore from "./pages/Explore";
-import Onboarding from "./pages/Onboarding";
-import { supabase } from "./lib/supabase";
-import Search from './pages/Search';
-import EditTrip from "./pages/EditTrip";
-import Feed from '@/components/Feed';
-import Navbar from '@/components/Navbar';
-import Notifications from '@/components/Notifications';
-import Experiences from './pages/Experiences';
-import BottomNav from '@/components/BottomNav';
-import { scrollToTop } from '@/lib/navigation-utils';
+/**
+ * App.tsx - Main application component and routing
+ * 
+ * FORCE REBUILD: 2023-07-23T10:25:00Z - CLEAR CACHE NOW
+ * 
+ * Fixed imports:
+ * - Updated to use runMigrations from ./lib/migrations instead of ./lib/migration
+ * - Added local scrollToTop implementation instead of importing from utils
+ * - Updated the Feed import to use the component from ./components/Feed
+ * - Installed react-hot-toast package for toast notifications
+ */
+
+import React, { useState, useEffect } from 'react';
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { AnimatePresence, motion } from 'framer-motion';
+import { BrowserRouter as Router } from 'react-router-dom';
+import { Link } from 'react-router-dom';
+import { supabase } from './lib/supabase';
+import runMigrations from './lib/migrations';
+import { cn } from './lib/utils';
+import { AuthProvider, useAuth } from './lib/auth-context';
+import { Toaster } from 'react-hot-toast';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import AppHeader from '@/components/AppHeader';
+import DesktopRestriction from './components/DesktopRestriction';
+
+// Simple scrollToTop function
+const scrollToTop = (smooth = true) => {
+  window.scrollTo({
+    top: 0,
+    behavior: smooth ? 'smooth' : 'auto'
+  });
+};
+
+// Import Pages
+import Login from './pages/Login';
+import SignUp from './pages/SignUp';
+import Onboarding from './pages/Onboarding';
+import ResetPassword from './pages/ResetPassword';
+import EmailConfirmation from './pages/EmailConfirmation';
+import NotFound from './pages/NotFound';
+import Trips from './pages/Trips';
+import Explore from './pages/Explore';
+import Profile from './pages/Profile';
+import Index from './pages/Index';
+import TripDetails from './pages/TripDetails';
+import CreateTrip from './pages/CreateTrip';
+import EditTrip from './pages/EditTrip';
+import Notifications from './components/Notifications';
+import LandingPage from './pages/LandingPage';
+import Feed from './components/Feed';
+import Experiences from './pages/Experiences';
+import Search from './pages/Search';
+import About from './pages/About';
+import Contact from './pages/Contact';
+import Terms from './pages/Terms';
+import Privacy from './pages/Privacy';
+import { BottomNav } from './components/BottomNav';
+
+// Create a client for react-query
+const queryClient = new QueryClient();
 
 // Error Boundary component to catch rendering errors
 interface ErrorBoundaryProps {
@@ -105,8 +131,6 @@ if (!document.getElementById('dancing-script-font')) {
   link.href = 'https://fonts.googleapis.com/css2?family=Dancing+Script:wght@400;700&display=swap';
   document.head.appendChild(link);
 }
-
-const queryClient = new QueryClient();
 
 // Protected route component with onboarding check
 const ProtectedRoute = ({ children, requireOnboarding = true }: { children: React.ReactNode, requireOnboarding?: boolean }) => {
@@ -217,29 +241,6 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   return <>{children}</>;
 };
 
-const AppHeader = () => {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-
-  return (
-    <header className="bg-white border-b border-gray-200 sticky top-0 z-40">
-      <div className="max-w-md mx-auto px-4 h-14 flex items-center justify-between">
-        <Link to="/" className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-gradient-to-br from-hireyth-main to-hireyth-light rounded-lg flex items-center justify-center">
-            <span className="text-xl font-bold text-white">H</span>
-          </div>
-          <span className="text-lg font-semibold text-gray-900">Hireyth</span>
-        </Link>
-        {user && (
-          <div className="flex items-center space-x-4">
-            <Notifications />
-          </div>
-        )}
-      </div>
-    </header>
-  );
-};
-
 const AuthRoute = ({ children }: { children: React.ReactNode }) => {
   const { user, loading } = useAuth();
   
@@ -326,11 +327,15 @@ const AppRoutes = () => {
         <AnimatePresence mode="wait">
           <Routes location={location} key={location.pathname}>
             <Route path="/" element={
-              <AuthRoute>
+              user ? (
                 <PageTransition>
                   <Feed />
                 </PageTransition>
-              </AuthRoute>
+              ) : (
+                <PageTransition>
+                  <LandingPage />
+                </PageTransition>
+              )
             } />
             <Route path="/login" element={
               <PageTransition>
@@ -345,6 +350,11 @@ const AppRoutes = () => {
             <Route path="/reset-password" element={
               <PageTransition>
                 <ResetPassword />
+              </PageTransition>
+            } />
+            <Route path="/email-confirmation" element={
+              <PageTransition>
+                <EmailConfirmation />
               </PageTransition>
             } />
             <Route path="/onboarding" element={
@@ -454,12 +464,14 @@ const AppContent = () => {
   
   return (
     <div className="min-h-screen bg-gray-50">
+      {/* Global AppHeader - only shown once at the app level */}
+      {user && <AppHeader />}
       <div className="max-w-md mx-auto">
-        <AppHeader />
         <div className={user ? 'pb-24' : ''}>
           <AppRoutes />
         </div>
       </div>
+      {/* Bottom navigation - only shown when user is logged in */}
       {user && <BottomNav />}
     </div>
   );
@@ -468,17 +480,16 @@ const AppContent = () => {
 const App = () => {
   return (
     <QueryClientProvider client={queryClient}>
-      <TooltipProvider>
-        <Toaster />
-        <Sonner />
-        <AuthProvider>
-          <BrowserRouter>
-            <ErrorBoundary>
+      <Toaster />
+      <AuthProvider>
+        <Router>
+          <ErrorBoundary>
+            <DesktopRestriction>
               <AppContent />
-            </ErrorBoundary>
-          </BrowserRouter>
-        </AuthProvider>
-      </TooltipProvider>
+            </DesktopRestriction>
+          </ErrorBoundary>
+        </Router>
+      </AuthProvider>
     </QueryClientProvider>
   );
 };
