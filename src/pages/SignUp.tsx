@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { Loader2 } from "lucide-react";
 import { Separator } from "@/components/ui/separator";
+import { Globe, User, Mail, LockIcon, ArrowRight, UsersRound, MapPin, Compass } from "lucide-react";
 
 // Create schema for form validation
 const signUpSchema = z.object({
@@ -139,135 +140,219 @@ const SignUp = () => {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 px-4 sm:px-6 lg:px-8">
-      <div className="sm:mx-auto sm:w-full sm:max-w-md">
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+    <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-700">
+      {/* Background Elements */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
+        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500 rounded-full opacity-20 filter blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-600 rounded-full opacity-20 filter blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      </div>
+      
+      {/* Content Container */}
+      <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative z-10">
+        {/* Logo and App Name */}
+        <div className="flex items-center mb-8 fade-in-up visible">
+          <Globe className="h-12 w-12 mr-3 text-white" />
+          <h1 className="text-5xl font-bold text-white">
+            Hireyth
+          </h1>
+        </div>
+        
+        <h2 className="text-2xl font-semibold text-white/90 mb-2 text-center fade-in-up visible" style={{ transitionDelay: '150ms' }}>
           Create your account
         </h2>
-        <p className="mt-2 text-center text-sm text-gray-600">
+        
+        <p className="text-lg text-white/80 mb-8 text-center max-w-md fade-in-up visible" style={{ transitionDelay: '200ms' }}>
           Join Hireyth and start your travel journey
         </p>
-      </div>
 
-      <Card className="mt-8 sm:mx-auto sm:w-full sm:max-w-md">
-        <CardContent className="pt-6">
-          <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Full Name</FormLabel>
-                    <FormControl>
-                      <Input placeholder="Enter your full name" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+        {/* Sign Up Form */}
+        <div className="w-full max-w-md fade-in-up visible" style={{ transitionDelay: '250ms' }}>
+          <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/10">
+            <Form {...form}>
+              <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
+                <FormField
+                  control={form.control}
+                  name="name"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm font-medium">Full Name</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60">
+                            <User className="h-5 w-5" />
+                          </div>
+                          <Input 
+                            placeholder="Enter your full name" 
+                            className="bg-white/10 border-white/20 text-white pl-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg"
+                            {...field} 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="username"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Username</FormLabel>
-                    <FormControl>
-                      <Input 
-                        placeholder="Choose a username" 
-                        {...field} 
-                        onChange={(e) => field.onChange(e.target.value.toLowerCase())}
-                      />
-                    </FormControl>
-                    <p className="text-xs text-gray-500">
-                      3-20 characters, letters, numbers, and underscores only
-                    </p>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="username"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm font-medium">Username</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60">
+                            <User className="h-5 w-5" />
+                          </div>
+                          <Input 
+                            placeholder="Choose a username" 
+                            className="bg-white/10 border-white/20 text-white pl-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg"
+                            {...field} 
+                            onChange={(e) => field.onChange(e.target.value.toLowerCase())}
+                          />
+                        </div>
+                      </FormControl>
+                      <p className="text-xs text-white/60 mt-1">
+                        3-20 characters, letters, numbers, and underscores only
+                      </p>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="email"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Email</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="email" 
-                        placeholder="Enter your email address" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="email"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm font-medium">Email</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60">
+                            <Mail className="h-5 w-5" />
+                          </div>
+                          <Input 
+                            type="email" 
+                            placeholder="Enter your email address" 
+                            className="bg-white/10 border-white/20 text-white pl-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg"
+                            {...field} 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="password"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Password</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="Create a password" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="password"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm font-medium">Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60">
+                            <LockIcon className="h-5 w-5" />
+                          </div>
+                          <Input 
+                            type="password" 
+                            placeholder="Create a password" 
+                            className="bg-white/10 border-white/20 text-white pl-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg"
+                            {...field} 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="confirmPassword"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Confirm Password</FormLabel>
-                    <FormControl>
-                      <Input 
-                        type="password" 
-                        placeholder="Confirm your password" 
-                        {...field} 
-                      />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="confirmPassword"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-white text-sm font-medium">Confirm Password</FormLabel>
+                      <FormControl>
+                        <div className="relative">
+                          <div className="absolute left-3 top-1/2 transform -translate-y-1/2 text-white/60">
+                            <LockIcon className="h-5 w-5" />
+                          </div>
+                          <Input 
+                            type="password" 
+                            placeholder="Confirm your password" 
+                            className="bg-white/10 border-white/20 text-white pl-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg"
+                            {...field} 
+                          />
+                        </div>
+                      </FormControl>
+                      <FormMessage className="text-red-300" />
+                    </FormItem>
+                  )}
+                />
 
-              <Button 
-                type="submit" 
-                className="w-full bg-hireyth-main hover:bg-hireyth-main/90" 
-                disabled={isLoading}
-              >
-                {isLoading ? (
-                  <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                ) : null}
-                {isLoading ? "Creating Account..." : "Sign Up"}
-              </Button>
-            </form>
-          </Form>
+                <Button 
+                  type="submit" 
+                  className="w-full bg-blue-600 text-white hover:bg-blue-700 font-semibold text-lg h-12 shadow-lg hover:shadow-xl transition-all shadow-black/20 rounded-lg mt-2"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <div className="flex items-center justify-center">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <span>Creating account...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-center">
+                      <span>Create Account</span>
+                      <ArrowRight className="ml-2 h-5 w-5" />
+                    </div>
+                  )}
+                </Button>
+              </form>
+            </Form>
+          </div>
 
-          <div className="mt-6">
-            <Separator className="my-4" />
-            <div className="text-center text-sm">
-              <span className="text-gray-500">
-                Already have an account?{" "}
-                <Link to="/login" className="font-medium text-hireyth-main hover:text-hireyth-main/90">
-                  Sign in
-                </Link>
-              </span>
+          {/* Feature highlights */}
+          <div className="grid grid-cols-3 gap-4 mt-8 px-4">
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10 flex items-center justify-center group relative">
+              <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center">
+                <UsersRound className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
+                Connect with travelers
+              </div>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10 flex items-center justify-center group relative">
+              <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center">
+                <MapPin className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
+                Discover adventures
+              </div>
+            </div>
+            
+            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10 flex items-center justify-center group relative">
+              <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center">
+                <Compass className="w-5 h-5 text-white" />
+              </div>
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
+                Explore the world
+              </div>
             </div>
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="mt-6 text-center pb-6">
+            <p className="text-white/80 text-sm">
+              Already have an account?{" "}
+              <Link to="/login" className="text-white hover:underline font-medium">
+                Sign in
+              </Link>
+            </p>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
