@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Settings, Image as ImageIcon, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X, Heart, MessageCircle, Globe, Grid, Bookmark, MapIcon, AlertTriangle, RefreshCw, Server, UserX, Home, LogOut, Calendar, Trash2 } from 'lucide-react';
+import { Settings, Image as ImageIcon, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X, Heart, MessageCircle, Globe, Grid, Bookmark, MapIcon, AlertTriangle, RefreshCw, Server, UserX, Home, LogOut, Calendar, Trash2, ArrowLeft, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import BottomNav from '@/components/BottomNav';
@@ -56,9 +56,9 @@ interface Trip {
   start_date: string;
   end_date: string;
   spots: number;
-  creator_id: string;
   creator_name: string;
   creator_image: string;
+  creator_id?: string;  // Make creator_id optional
   status?: string;
 }
 
@@ -1511,15 +1511,40 @@ const Profile = () => {
             
             {/* Bio */}
             {isEditMode ? (
-              <Textarea
-                value={editForm.bio || ''}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                placeholder="Write something about yourself"
-                className="mt-2 max-w-md mx-auto mb-5"
-              />
-            ) : profileData?.bio && (
-              <p className="max-w-md mx-auto mb-5 text-sm">{profileData.bio}</p>
-            )}
+              <div className="mt-4 mb-6 max-w-lg mx-auto">
+                <label className="text-sm font-medium text-gray-700 mb-1 block">About</label>
+                <Textarea
+                  value={editForm.bio || ''}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  placeholder="Write something about yourself..."
+                  className="resize-none h-24"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  Share a little about yourself, your interests, and your travel style.
+                </p>
+              </div>
+            ) : profileData?.bio ? (
+              <div className="max-w-lg mx-auto mb-6 mt-3">
+                <div className="bg-white/10 backdrop-blur-md p-4 rounded-xl border border-white/20 relative">
+                  <div className="absolute -top-3 left-4 bg-blue-100 rounded-full p-1.5">
+                    <User className="h-4 w-4 text-blue-600" />
+                  </div>
+                  <h4 className="text-sm font-medium text-white/90 mb-2 pl-1">About</h4>
+                  <p className="text-white/80 text-sm leading-relaxed whitespace-pre-line pl-1">{profileData.bio}</p>
+                </div>
+              </div>
+            ) : isOwnProfile ? (
+              <div className="max-w-lg mx-auto mb-6 mt-3">
+                <Button 
+                  variant="ghost" 
+                  className="text-white/70 hover:text-white hover:bg-white/10 flex items-center text-sm"
+                  onClick={() => setIsEditMode(true)}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add bio
+                </Button>
+              </div>
+            ) : null}
             
             {/* Stats */}
             <div className="flex justify-center space-x-6 mb-6">
@@ -1697,17 +1722,27 @@ const Profile = () => {
                 {experiences.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-600">No experiences shared yet</p>
-              {isOwnProfile && (
-                <Button
-                  onClick={() => setShowAddExperience(true)}
-                        className="mt-4 bg-hireyth-main hover:bg-hireyth-main/90"
-                >
+                    {isOwnProfile && (
+                      <Button
+                        onClick={() => setShowAddExperience(true)}
+                        className="mt-4 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                      >
                         Add Your First Experience
-                </Button>
-              )}
+                      </Button>
+                    )}
                   </div>
                 ) : (
                   <>
+                    {isOwnProfile && (
+                      <div className="flex justify-end mb-6">
+                        <Button
+                          onClick={() => setShowAddExperience(true)}
+                          className="bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white"
+                        >
+                          Share Experience
+                        </Button>
+                      </div>
+                    )}
                     <div className="space-y-6">
                   {experiences.map((exp: Experience) => (
                         <div key={exp.id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 hover:shadow-lg transition-shadow duration-300">
@@ -1827,10 +1862,9 @@ const Profile = () => {
         {/* Add Experience Dialog */}
         {isOwnProfile && (
           <AddExperienceDialog
-            open={showAddExperience}
-            onOpenChange={setShowAddExperience}
+            isOpen={showAddExperience}
+            onClose={() => setShowAddExperience(false)}
             onExperienceAdded={handleExperienceAdded}
-            userId={user?.id || ''}
           />
         )}
         
