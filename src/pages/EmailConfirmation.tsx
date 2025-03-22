@@ -4,24 +4,50 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, Loader2, Globe } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
+import { useToast } from '@/components/ui/use-toast';
 
 const EmailConfirmation = () => {
   const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading');
   const [message, setMessage] = useState<string>('Verifying your email...');
+  const [email, setEmail] = useState<string | null>(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const { toast } = useToast();
 
   useEffect(() => {
     const checkEmailConfirmation = async () => {
       try {
+        console.log('Email confirmation page loaded');
+        console.log('URL:', window.location.href);
+        console.log('Hash:', window.location.hash);
+        
         // Get URL parameters
         const url = new URL(window.location.href);
-        const params = new URLSearchParams(url.hash.substring(1));
+        const hashParams = new URLSearchParams(url.hash.substring(1));
+        
+        // Check for parameters in the hash
+        const error = hashParams.get('error');
+        const errorDescription = hashParams.get('error_description');
+        const accessToken = hashParams.get('access_token');
+        const refreshToken = hashParams.get('refresh_token');
+        const type = hashParams.get('type');
+        const email = hashParams.get('email');
+        
+        console.log('URL Parameters:', {
+          error,
+          errorDescription,
+          accessToken: accessToken ? 'exists' : 'not found',
+          refreshToken: refreshToken ? 'exists' : 'not found',
+          type,
+          email
+        });
+        
+        // Set the email if available
+        if (email) {
+          setEmail(email);
+        }
         
         // Check for error in URL
-        const error = params.get('error');
-        const errorDescription = params.get('error_description');
-        
         if (error) {
           console.error('Email confirmation error:', errorDescription);
           setStatus('error');
@@ -30,11 +56,35 @@ const EmailConfirmation = () => {
         }
         
         // Check for success (type=recovery or type=signup)
-        const type = params.get('type');
-        
         if (type === 'signup') {
           setStatus('success');
           setMessage('Your email has been successfully confirmed!');
+          
+          // Create a toast notification
+          toast({
+            title: 'Email Confirmed',
+            description: 'Your account has been successfully activated. You can now log in.',
+          });
+          
+          // Force refresh the session
+          if (accessToken && refreshToken) {
+            try {
+              await supabase.auth.setSession({
+                access_token: accessToken,
+                refresh_token: refreshToken
+              });
+              console.log('Session set successfully');
+              
+              // Wait a moment before redirecting to ensure session is set
+              setTimeout(() => {
+                navigate('/login?confirmed=true');
+              }, 2000);
+              return;
+            } catch (sessionError) {
+              console.error('Error setting session:', sessionError);
+            }
+          }
+          
           return;
         }
         
@@ -45,39 +95,46 @@ const EmailConfirmation = () => {
         }
         
         // Check if there's an access_token, which means the email was confirmed
-        const accessToken = params.get('access_token');
         if (accessToken) {
           // Successfully confirmed email
           setStatus('success');
           setMessage('Your email has been successfully confirmed!');
           
           // Set the session manually
-          const { data, error: sessionError } = await supabase.auth.getSession();
-          if (sessionError) {
-            console.error('Error getting session:', sessionError);
-          }
-          
-          if (!data.session) {
-            // If no session yet, try to refresh
-            await supabase.auth.refreshSession();
+          try {
+            await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken || ''
+            });
+            console.log('Session set successfully from access token');
+          } catch (sessionError) {
+            console.error('Error setting session from tokens:', sessionError);
           }
           
           return;
         }
         
         // If we reach here, no clear confirmation status was found
+        console.log('No clear confirmation status found, checking for session');
         setStatus('loading');
-        setTimeout(() => {
-          // After a delay, check for session presence as a fallback method
-          supabase.auth.getSession().then(({ data }) => {
-            if (data?.session) {
-              setStatus('success');
-              setMessage('Your email has been confirmed!');
-            } else {
-              setStatus('error');
-              setMessage('Could not verify your email confirmation status. Please try logging in.');
-            }
-          });
+        
+        // After a delay, check for session presence as a fallback method
+        setTimeout(async () => {
+          const { data, error } = await supabase.auth.getSession();
+          console.log('Session check result:', { data, error });
+          
+          if (data?.session) {
+            setStatus('success');
+            setMessage('Your email has been confirmed!');
+            
+            // Wait a moment before redirecting to ensure UI update
+            setTimeout(() => {
+              navigate('/login?confirmed=true');
+            }, 2000);
+          } else {
+            setStatus('error');
+            setMessage('Could not verify your email confirmation status. Please try logging in.');
+          }
         }, 2000);
       } catch (error) {
         console.error('Error checking email confirmation:', error);
@@ -87,7 +144,7 @@ const EmailConfirmation = () => {
     };
 
     checkEmailConfirmation();
-  }, [navigate, location]);
+  }, [navigate, location, toast]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-600 to-indigo-700 flex flex-col items-center justify-center p-4">
@@ -135,6 +192,9 @@ const EmailConfirmation = () => {
           
           <CardDescription className="text-white/80 text-center">
             {message}
+            {email && status === 'success' && (
+              <div className="mt-2">for <span className="font-medium">{email}</span></div>
+            )}
           </CardDescription>
         </CardHeader>
         
@@ -146,10 +206,21 @@ const EmailConfirmation = () => {
           )}
           
           {status === 'error' && (
-            <p className="text-white/80 text-center">
-              Please check your email and try clicking the confirmation link again.
-              If the problem persists, contact support.
-            </p>
+            <div className="space-y-4">
+              <p className="text-white/80 text-center">
+                Please check your email and try clicking the confirmation link again.
+                If the problem persists, contact support.
+              </p>
+              <div className="bg-white/10 p-4 rounded-lg">
+                <h3 className="text-white font-medium mb-2">Troubleshooting Tips:</h3>
+                <ul className="text-white/80 text-sm space-y-2 ml-2">
+                  <li>• Make sure you're using the most recent confirmation email</li>
+                  <li>• Check if you're already logged in on another device</li>
+                  <li>• Clear your browser cookies and try again</li>
+                  <li>• Try using a different browser or device</li>
+                </ul>
+              </div>
+            </div>
           )}
         </CardContent>
         

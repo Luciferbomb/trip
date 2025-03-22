@@ -29,4 +29,59 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Configure email confirmation URL
+export const getEmailRedirectUrl = () => {
+  // Use the deployed site URL if available, fallback to current origin
+  const baseUrl = 
+    process.env.NODE_ENV === 'production' 
+      ? 'https://hireyth.netlify.app' 
+      : window.location.origin;
+  
+  return `${baseUrl}/email-confirmation`;
+};
+
+// Helper function to resend confirmation email
+export const resendConfirmationEmail = async (email: string) => {
+  try {
+    console.log('Attempting to resend confirmation email to:', email);
+    console.log('Redirect URL:', getEmailRedirectUrl());
+    
+    const { error } = await supabase.auth.resend({
+      type: 'signup',
+      email,
+      options: {
+        emailRedirectTo: getEmailRedirectUrl(),
+      }
+    });
+    
+    if (error) {
+      console.error('Error from Supabase resend:', error);
+    } else {
+      console.log('Confirmation email resend successful');
+    }
+    
+    return { error };
+  } catch (err) {
+    console.error('Exception when resending confirmation email:', err);
+    return { error: err };
+  }
+};
+
+// Configure auth state change listener for debugging
+supabase.auth.onAuthStateChange((event, session) => {
+  console.log(`Auth state changed: ${event}`, session);
+  
+  if (event === 'SIGNED_IN') {
+    console.log('User signed in:', session?.user?.email);
+    console.log('User metadata:', session?.user?.user_metadata);
+  } else if (event === 'USER_UPDATED') {
+    console.log('User updated:', session?.user?.email);
+    console.log('Email confirmed at:', session?.user?.email_confirmed_at);
+  } else if (event === 'PASSWORD_RECOVERY') {
+    console.log('Password recovery initiated');
+  } else if (event === 'SIGNED_OUT') {
+    console.log('User signed out');
+  }
+});
+
 export default supabase; 

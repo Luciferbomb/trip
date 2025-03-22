@@ -8,6 +8,8 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 
+// Commenting out this component since we're using our custom ToastProvider
+/*
 export function Toaster() {
   const { toasts } = useToast()
 
@@ -30,4 +32,10 @@ export function Toaster() {
       <ToastViewport />
     </ToastProvider>
   )
+}
+*/
+
+// Export an empty component to avoid import errors
+export function Toaster() {
+  return null;
 }

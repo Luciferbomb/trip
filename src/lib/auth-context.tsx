@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { Session, User } from '@supabase/supabase-js';
-import { supabase } from './supabase';
+import { supabase, supabaseAdmin } from './supabase';
 
 // Define the getEmailRedirectUrl function directly in this file
 const getEmailRedirectUrl = () => {
@@ -107,84 +107,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Sign up with email and password
   const signUp = async (email: string, password: string, userData: any) => {
     try {
-      setLoading(true);
-      
-      // Create the user in Supabase Auth
-      const { data: authData, error: authError } = await supabase.auth.signUp({
+      // First check if user already exists via the admin API
+      const { data: existingUsers } = await supabaseAdmin
+        .from('users')
+        .select('email')
+        .eq('email', email)
+        .limit(1);
+
+      if (existingUsers && existingUsers.length > 0) {
+        console.log('User already exists with this email');
+        return {
+          error: {
+            message: 'This email is already registered. Please sign in instead.'
+          },
+          user: null
+        };
+      }
+
+      const { data, error } = await supabase.auth.signUp({
         email,
         password,
         options: {
-          data: userData,
-          emailRedirectTo: getEmailRedirectUrl()
-        }
+          data: {
+            ...userData,
+            onboarded: false,
+          },
+          emailRedirectTo: getEmailRedirectUrl(),
+        },
       });
-      
-      if (authError) {
-        return { error: authError, user: null };
+
+      if (error) {
+        console.error('Signup error:', error.message);
+        return { error, user: null };
       }
-      
-      if (!authData.user) {
-        return { error: { message: 'No user data returned from auth signup' }, user: null };
+
+      // Check if the user already exists (signUp doesn't throw an error for existing users
+      // but returns an empty user and a session)
+      if (!data.user && data.session) {
+        console.log('User exists but no error was thrown');
+        return {
+          error: {
+            message: 'This email is already registered. Please sign in instead.'
+          },
+          user: null
+        };
       }
+
+      // Log success for debugging
+      console.log('Signup successful. User ID:', data.user?.id);
+      console.log('Confirmation email should be sent to:', email);
+      console.log('Redirect URL configured as:', getEmailRedirectUrl());
       
-      try {
-        // Create the user profile in the database
-        const { error: profileError } = await supabase
-          .from('users')
-          .insert({
-            id: authData.user.id,
-            email: email,
-            username: email.split('@')[0], // Generate username from email as default
-            created_at: new Date().toISOString(),
-            updated_at: new Date().toISOString(),
-            onboarding_completed: false
-          })
-          .select()
-          .single();
-
-        if (profileError) {
-          // If profile creation fails, clean up the auth user
-          await supabase.auth.admin.deleteUser(authData.user.id);
-          
-          if (profileError.message?.includes('duplicate key')) {
-            if (profileError.message.includes('users_email_key')) {
-              return { error: { message: 'Email is already registered' }, user: null };
-            }
-            if (profileError.message.includes('users_username_key')) {
-              return { error: { message: 'Username is already taken' }, user: null };
-            }
-          }
-          return { error: profileError, user: null };
-        }
-
-        // Create storage bucket for user if it doesn't exist
-        const { error: storageError } = await supabase
-          .storage
-          .createBucket(`user-${authData.user.id}`, {
-            public: false,
-            allowedMimeTypes: ['image/*'],
-            fileSizeLimit: 5242880 // 5MB
-          });
-
-        if (storageError && !storageError.message.includes('already exists')) {
-          console.error('Error creating user storage bucket:', storageError);
-        }
-
-        return { error: null, user: authData.user };
-      } catch (error: any) {
-        // Clean up auth user if profile creation fails
-        await supabase.auth.admin.deleteUser(authData.user.id);
-        throw error;
+      if (data.user) {
+        // We won't insert into the users table here, as we'll do it after email confirmation
+        return { error: null, user: data.user };
+      } else {
+        console.error('No user was created during signup');
+        return {
+          error: {
+            message: 'Failed to create account. Please try again later.'
+          },
+          user: null
+        };
       }
-    } catch (error: any) {
-      console.error('Signup error:', error);
-      return { 
-        error: { 
-          message: error.message?.includes('duplicate key') 
-            ? 'Username or email already exists' 
-            : error.message || 'An unexpected error occurred'
-        }, 
-        user: null 
+    } catch (err: any) {
+      console.error('Unexpected error during signup:', err);
+      return {
+        error: {
+          message: err.message || 'An unexpected error occurred during signup.'
+        },
+        user: null
       };
     }
   };

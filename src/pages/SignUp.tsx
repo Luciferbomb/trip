@@ -12,6 +12,8 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { scrollToTop } from "@/lib/navigation-utils";
+import { supabase } from "@/lib/supabase";
+import { resendConfirmationEmail } from "@/lib/supabase";
 
 // Create schema for form validation
 const signUpSchema = z.object({
@@ -25,6 +27,8 @@ const SignUp = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [signUpCompleted, setSignUpCompleted] = useState(false);
+  const [registeredEmail, setRegisteredEmail] = useState<string>("");
+  const [resendingEmail, setResendingEmail] = useState(false);
   const { signUp } = useAuth();
   const navigate = useNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -48,16 +52,91 @@ const SignUp = () => {
     setError(null);
     
     try {
-      await signUp(data.email, data.password, {});
+      // First check if the email already exists
+      const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: "random_temp_password_check",
+      });
+      
+      // If there's no generic "invalid credentials" error, it likely means the email exists
+      if (signInError && !signInError.message.includes("Invalid login credentials")) {
+        setError(signInError.message);
+        setIsLoading(false);
+        return;
+      }
+      
+      // If we got a user back or a auth/user-not-found error wasn't thrown, email exists
+      if (signInData.user) {
+        setError("This email is already registered. Please use the login page instead.");
+        setIsLoading(false);
+        return;
+      }
+      
+      // Proceed with signup if email doesn't exist
+      const { error, user } = await signUp(data.email, data.password, {});
+      
+      if (error) {
+        // Handle specific error cases more explicitly
+        if (error.message?.includes("already registered") || 
+            error.message?.includes("already exists")) {
+          setError("This email is already registered. Please try signing in instead.");
+        } else {
+          setError(error.message || 'Failed to sign up. Please try again.');
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      setRegisteredEmail(data.email);
       setSignUpCompleted(true);
+      
       toast({
-        title: 'Success',
-        description: 'Please check your email to confirm your account.',
+        title: 'Account Created',
+        description: 'Please check your email to confirm your account before logging in.',
       });
     } catch (err: any) {
       console.error('SignUp error:', err);
       setError(err.message || 'Failed to sign up. Please try again.');
       setIsLoading(false);
+    }
+  };
+  
+  const handleResendConfirmation = async () => {
+    if (!registeredEmail) {
+      toast({
+        title: 'Error',
+        description: 'Email address not found. Please try signing up again.',
+        variant: 'destructive'
+      });
+      return;
+    }
+
+    setResendingEmail(true);
+    
+    try {
+      // Use the enhanced resendConfirmationEmail function
+      const { error } = await resendConfirmationEmail(registeredEmail);
+      
+      if (error) {
+        toast({
+          title: 'Error',
+          description: error.message || 'Failed to resend confirmation email. Please try again.',
+          variant: 'destructive'
+        });
+      } else {
+        toast({
+          title: 'Email Sent',
+          description: 'Confirmation email has been resent. Please check your inbox (including spam folder).',
+        });
+      }
+    } catch (err: any) {
+      toast({
+        title: 'Error',
+        description: err.message || 'An unexpected error occurred.',
+        variant: 'destructive'
+      });
+    } finally {
+      setResendingEmail(false);
     }
   };
   
@@ -81,11 +160,19 @@ const SignUp = () => {
               </div>
               <h1 className="text-2xl font-bold text-white mb-2">Email Confirmation Sent</h1>
               <p className="text-white/80 mb-6">
-                We've sent a confirmation link to your email address. Please check your inbox and click the link to activate your account.
+                We've sent a confirmation link to <span className="font-semibold">{registeredEmail || "your email address"}</span>. Please check your inbox and click the link to activate your account.
               </p>
-              <p className="text-white/70 text-sm mb-8">
-                If you don't see the email, please check your spam folder.
-              </p>
+              
+              <div className="bg-white/10 p-4 rounded-lg mb-6 text-left">
+                <h3 className="text-white font-medium mb-2">Important Information:</h3>
+                <ul className="text-white/80 text-sm space-y-2">
+                  <li>• The confirmation email may take a few minutes to arrive</li>
+                  <li>• Please check your spam/junk folder if you don't see it</li>
+                  <li>• The confirmation link will expire after 24 hours</li>
+                  <li>• You must confirm your email before you can log in</li>
+                </ul>
+              </div>
+              
               <div className="flex flex-col space-y-3 w-full">
                 <Button 
                   variant="sleek"
@@ -97,6 +184,21 @@ const SignUp = () => {
                 <Button 
                   variant="outline" 
                   className="w-full text-white border-white/30 hover:bg-white/10"
+                  onClick={handleResendConfirmation}
+                  disabled={resendingEmail}
+                >
+                  {resendingEmail ? (
+                    <div className="flex items-center">
+                      <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                      <span>Resending...</span>
+                    </div>
+                  ) : (
+                    "Resend Confirmation Email"
+                  )}
+                </Button>
+                <Button 
+                  variant="ghost" 
+                  className="w-full text-white/70 hover:text-white hover:bg-white/10"
                   onClick={() => setSignUpCompleted(false)}
                 >
                   Back to Sign Up

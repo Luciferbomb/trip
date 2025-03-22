@@ -12,6 +12,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { useForm } from "react-hook-form";
 import { cn } from "@/lib/utils";
 import { scrollToTop } from "@/lib/navigation-utils";
+import { supabase } from '@/lib/supabase';
 
 // Create schema for form validation
 const loginSchema = z.object({
@@ -61,11 +62,46 @@ const Login = () => {
     setError(null);
     
     try {
-      await signIn(data.email, data.password);
+      // First check if the email is confirmed
+      const { data: userData, error: userError } = await supabase.auth.signInWithPassword({
+        email: data.email,
+        password: data.password
+      });
+      
+      // Specific checks for unconfirmed email
+      if (userError && (
+        userError.message?.includes("Email not confirmed") || 
+        userError.message?.includes("Please verify your email")
+      )) {
+        setError("Your email has not been confirmed yet. Please check your inbox for the confirmation link.");
+        setIsLoading(false);
+        
+        // Show resend option
+        toast({
+          title: 'Email Not Confirmed',
+          description: 'Please check your inbox for the confirmation link or go to sign up page to resend it.',
+        });
+        return;
+      }
+      
+      // If we have other auth errors
+      if (userError) {
+        // Provide more user-friendly error messages
+        if (userError.message?.includes("Invalid login credentials")) {
+          setError("Incorrect email or password. Please try again.");
+        } else {
+          setError(userError.message || 'Failed to sign in. Please check your credentials and try again.');
+        }
+        setIsLoading(false);
+        return;
+      }
+      
+      // If we got here, login was successful
       toast({
         title: 'Success',
         description: 'You have been successfully signed in.',
       });
+      // Navigation will be handled by the useEffect that watches for user changes
     } catch (err: any) {
       console.error('Login error:', err);
       setError(err.message || 'Failed to sign in. Please check your credentials and try again.');

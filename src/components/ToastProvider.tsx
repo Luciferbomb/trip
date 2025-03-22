@@ -1,7 +1,7 @@
 import React, { useState, useCallback, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, AlertCircle, Info } from 'lucide-react';
-import { ToastContext } from '../hooks/use-toast';
+import { ToastContext } from '../components/ui/use-toast';
 
 // Types
 type ToastType = 'success' | 'error' | 'info';
