@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Settings, Image as ImageIcon, MapPin, Instagram, Linkedin, Mail, Phone, User, ChevronRight, Save, Edit, Camera, Loader2, UserPlus, UserMinus, X, Heart, MessageCircle, Globe, Grid, Bookmark, MapIcon, AlertTriangle, RefreshCw, Server, UserX, Home, LogOut, Calendar, Trash2, ArrowLeft, PlusCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import BottomNav from '@/components/BottomNav';
+import { BottomNav } from '@/components/BottomNav';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
@@ -233,6 +233,23 @@ const Profile = () => {
           return;
         }
         
+        // If not onboarded, redirect to onboarding
+        if (!data.onboarding_completed) {
+          navigate('/onboarding');
+          return;
+        }
+        
+        // If no username, redirect to onboarding to complete profile
+        if (!data.username) {
+          toast({
+            title: 'Complete your profile',
+            description: 'Please complete your profile setup with a username',
+            variant: 'destructive'
+          });
+          navigate('/onboarding');
+          return;
+        }
+        
         userData = data;
       } else if (username) {
         // Fetch profile by username
@@ -245,6 +262,13 @@ const Profile = () => {
         if (error) throw error;
         if (!data) {
           setError('Profile not found');
+          navigate('/404');
+          return;
+        }
+        
+        // Check if user has completed onboarding and has a username
+        if (!data.onboarding_completed || !data.username) {
+          setError('This user has not completed their profile setup');
           navigate('/404');
           return;
         }

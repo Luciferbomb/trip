@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Search, MapPin, Filter, Loader2, RefreshCw, Users, Compass, BookOpen } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -13,6 +13,9 @@ import { useInfiniteQuery } from '@tanstack/react-query';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { PostgrestFilterBuilder } from '@supabase/postgrest-js';
 import { TravelDestinationCard } from '../components/TravelDestinationCard';
+import { useAuth } from '@/lib/auth-context';
+import { useToast } from '@/components/ui/use-toast';
+import MapboxSearch from '@/components/MapboxSearch';
 
 // Safe import of useInView with fallback
 let useInViewImported;
@@ -81,13 +84,14 @@ const PAGE_SIZE = 12;
 const AUTO_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 
 const Explore = () => {
-  const navigate = useNavigate();
-  const [searchQuery, setSearchQuery] = useState('');
-  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState('');
-  const [activeTab, setActiveTab] = useState('all');
-  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>('all');
+  const [searchQuery, setSearchQuery] = useState<string>('');
+  const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
-  const [showFilters, setShowFilters] = useState(false);
+  const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
+  const [showFilters, setShowFilters] = useState<boolean>(false);
+  const { user } = useAuth();
+  const navigate = useNavigate();
   
   // Create manual fallback in case the hook fails inside the component
   const fallbackRef = useRef(null);
@@ -102,7 +106,7 @@ const Explore = () => {
     observerHook = { ref: fallbackRef, inView: manualInView };
   }
   
-  // Destructure safely with defaults
+  // Destructure safely with defaults and ensure proper null checking
   const { ref = fallbackRef, inView = true } = observerHook || {};
 
   // Available tags/categories for filtering
@@ -119,87 +123,110 @@ const Explore = () => {
   
   // Fetch data based on active tab
   const fetchData = async ({ pageParam = 0 }) => {
-    const from = pageParam * PAGE_SIZE;
-    const to = from + PAGE_SIZE - 1;
-    
-    const searchFilter = debouncedSearchQuery.toLowerCase();
-    const locationFilter = selectedLocation?.toLowerCase();
-    
-    // Always fetch trips regardless of tab (for 'all' or 'trips' tabs)
-    let tripsQuery = supabase
-      .from('trips')
-      .select('*')
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
-      .range(from, to);
+    try {
+      const from = pageParam * PAGE_SIZE;
+      const to = from + PAGE_SIZE - 1;
       
-    if (searchFilter) {
-      tripsQuery = tripsQuery.or(`title.ilike.%${searchFilter}%,description.ilike.%${searchFilter}%,location.ilike.%${searchFilter}%`);
-    }
-    
-    if (locationFilter) {
-      tripsQuery = tripsQuery.ilike('location', `%${locationFilter}%`);
-    }
-    
-    // Always fetch experiences regardless of tab (for 'all' or 'experiences' tabs)
-    let experiencesQuery = supabase
-      .from('experiences')
-      .select('*, user:users(name, profile_image, username)')
-      .order('created_at', { ascending: false })
-      .range(from, to);
+      const searchFilter = debouncedSearchQuery.toLowerCase();
+      const locationFilter = selectedLocation?.toLowerCase();
       
-    if (searchFilter) {
-      experiencesQuery = experiencesQuery.or(`title.ilike.%${searchFilter}%,description.ilike.%${searchFilter}%,location.ilike.%${searchFilter}%`);
-    }
-    
-    if (locationFilter) {
-      experiencesQuery = experiencesQuery.ilike('location', `%${locationFilter}%`);
-    }
-    
-    // Always fetch users regardless of tab (for 'all' or 'people' tabs)
-    let usersQuery = supabase
-      .from('users')
-      .select('*')
-      .range(from, to);
+      // Always fetch trips regardless of tab (for 'all' or 'trips' tabs)
+      let tripsQuery = supabase
+        .from('trips')
+        .select('*')
+        .eq('status', 'active')
+        .order('created_at', { ascending: false })
+        .range(from, to);
+        
+      if (searchFilter) {
+        tripsQuery = tripsQuery.or(`title.ilike.%${searchFilter}%,description.ilike.%${searchFilter}%,location.ilike.%${searchFilter}%`);
+      }
       
-    if (searchFilter) {
-      usersQuery = usersQuery.or(`name.ilike.%${searchFilter}%,username.ilike.%${searchFilter}%,bio.ilike.%${searchFilter}%`);
-    }
-    
-    if (locationFilter) {
-      usersQuery = usersQuery.ilike('location', `%${locationFilter}%`);
-    }
-    
-    const [tripsResult, experiencesResult, usersResult] = await Promise.all([
-      tripsQuery,
-      experiencesQuery,
-      usersQuery
-    ]);
-    
-    // Apply tag filtering client side if necessary (since it might be JSON array in the DB)
-    let filteredTrips = tripsResult.data || [];
-    let filteredExperiences = experiencesResult.data || [];
-    
-    if (selectedTags.length > 0) {
-      filteredTrips = filteredTrips.filter(trip => 
-        trip.tags && selectedTags.some(tag => trip.tags.includes(tag))
-      );
+      if (locationFilter) {
+        tripsQuery = tripsQuery.ilike('location', `%${locationFilter}%`);
+      }
       
-      filteredExperiences = filteredExperiences.filter(exp => 
-        exp.categories && selectedTags.some(tag => exp.categories.includes(tag))
-      );
+      // Always fetch experiences regardless of tab (for 'all' or 'experiences' tabs)
+      let experiencesQuery = supabase
+        .from('experiences')
+        .select('*, user:users(name, profile_image, username)')
+        .order('created_at', { ascending: false })
+        .range(from, to);
+        
+      if (searchFilter) {
+        experiencesQuery = experiencesQuery.or(`title.ilike.%${searchFilter}%,description.ilike.%${searchFilter}%,location.ilike.%${searchFilter}%`);
+      }
+      
+      if (locationFilter) {
+        experiencesQuery = experiencesQuery.ilike('location', `%${locationFilter}%`);
+      }
+      
+      // Always fetch users regardless of tab (for 'all' or 'people' tabs)
+      let usersQuery = supabase
+        .from('users')
+        .select('*')
+        .eq('onboarding_completed', true)
+        .not('username', 'is', null)
+        .range(from, to);
+        
+      // Filter out the current logged-in user
+      if (user) {
+        usersQuery = usersQuery.neq('id', user.id);
+      }
+        
+      if (searchFilter) {
+        usersQuery = usersQuery.or(`name.ilike.%${searchFilter}%,username.ilike.%${searchFilter}%,bio.ilike.%${searchFilter}%`);
+      }
+      
+      if (locationFilter) {
+        usersQuery = usersQuery.ilike('location', `%${locationFilter}%`);
+      }
+      
+      const results = await Promise.allSettled([
+        tripsQuery,
+        experiencesQuery,
+        usersQuery
+      ]);
+      
+      // Handle results safely
+      const tripsResult = results[0].status === 'fulfilled' ? results[0].value : { data: [] };
+      const experiencesResult = results[1].status === 'fulfilled' ? results[1].value : { data: [] };
+      const usersResult = results[2].status === 'fulfilled' ? results[2].value : { data: [] };
+      
+      // Apply tag filtering client side if necessary (since it might be JSON array in the DB)
+      let filteredTrips = tripsResult.data || [];
+      let filteredExperiences = experiencesResult.data || [];
+      let filteredUsers = usersResult.data || [];
+      
+      if (selectedTags.length > 0) {
+        filteredTrips = filteredTrips.filter(trip => 
+          trip.tags && selectedTags.some(tag => trip.tags.includes(tag))
+        );
+        
+        filteredExperiences = filteredExperiences.filter(exp => 
+          exp.categories && selectedTags.some(tag => exp.categories.includes(tag))
+        );
+      }
+      
+      return {
+        trips: (activeTab === 'all' || activeTab === 'trips') ? filteredTrips as Trip[] : [],
+        experiences: (activeTab === 'all' || activeTab === 'experiences') ? filteredExperiences as Experience[] : [],
+        users: (activeTab === 'all' || activeTab === 'people') ? filteredUsers as User[] : [],
+        nextPage: (filteredTrips.length === PAGE_SIZE || 
+                  filteredExperiences.length === PAGE_SIZE || 
+                  filteredUsers.length === PAGE_SIZE) 
+          ? pageParam + 1 
+          : undefined,
+      };
+    } catch (error) {
+      console.error('Error fetching data:', error);
+      return {
+        trips: [],
+        experiences: [],
+        users: [],
+        nextPage: undefined
+      };
     }
-    
-    return {
-      trips: (activeTab === 'all' || activeTab === 'trips') ? filteredTrips as Trip[] : [],
-      experiences: (activeTab === 'all' || activeTab === 'experiences') ? filteredExperiences as Experience[] : [],
-      users: (activeTab === 'all' || activeTab === 'people') ? usersResult.data as User[] : [],
-      nextPage: (filteredTrips.length === PAGE_SIZE || 
-                filteredExperiences.length === PAGE_SIZE || 
-                usersResult.data.length === PAGE_SIZE) 
-        ? pageParam + 1 
-        : undefined,
-    };
   };
 
   const {
@@ -264,11 +291,20 @@ const Explore = () => {
       users: [] as User[]
     };
     
-    data?.pages.forEach(page => {
-      items.trips.push(...page.trips);
-      items.experiences.push(...page.experiences);
-      items.users.push(...page.users);
-    });
+    // Add safety check for empty data
+    if (!data?.pages) {
+      return items;
+    }
+    
+    try {
+      data.pages.forEach(page => {
+        if (page.trips) items.trips.push(...page.trips);
+        if (page.experiences) items.experiences.push(...page.experiences);
+        if (page.users) items.users.push(...page.users);
+      });
+    } catch (error) {
+      console.error('Error processing data:', error);
+    }
     
     return items;
   }, [data]);
@@ -512,14 +548,14 @@ const Explore = () => {
             {(activeTab === 'all' || activeTab === 'trips') && allItems.trips.map(trip => (
               <TravelDestinationCard
                 key={`trip-${trip.id}`}
-                imageSrc={trip.image_url}
-                location={trip.location}
-                description={trip.title}
+                imageSrc={trip.image_url || 'https://via.placeholder.com/400x250'}
+                location={trip.location || 'Unknown location'}
+                description={trip.title || 'Untitled trip'}
                 rating={4.5}
-                creatorName={trip.creator_name}
-                creatorImage={trip.creator_image} 
-                creatorId={trip.creator_id}
-                creatorUsername={trip.creator_username}
+                creatorName={trip.creator_name || 'Anonymous'}
+                creatorImage={trip.creator_image || ''} 
+                creatorId={trip.creator_id || ''}
+                creatorUsername={trip.creator_username || 'user'}
                 itemType="trip"
                 onClick={() => navigate(`/trips/${trip.id}`)}
               />
@@ -530,11 +566,11 @@ const Explore = () => {
               <TravelDestinationCard
                 key={`experience-${experience.id}`}
                 imageSrc={experience.image_url || 'https://via.placeholder.com/400x250'}
-                location={experience.location}
-                description={experience.title}
-                creatorName={experience.user.name}
-                creatorImage={experience.user.profile_image}
-                creatorUsername={experience.user.username}
+                location={experience.location || 'Unknown location'}
+                description={experience.title || 'Untitled experience'}
+                creatorName={experience.user?.name || 'Anonymous'}
+                creatorImage={experience.user?.profile_image || ''}
+                creatorUsername={experience.user?.username || 'user'}
                 itemType="experience" 
                 onClick={() => navigate(`/experiences/${experience.id}`)}
               />
@@ -551,7 +587,7 @@ const Explore = () => {
                   <Avatar className="h-16 w-16 mb-3 border-2 border-gray-200 ring-2 ring-blue-100">
                     <AvatarImage src={user.profile_image} />
                     <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-                      {user.name[0]}
+                      {user.name && user.name.length > 0 ? user.name[0] : '?'}
                     </AvatarFallback>
                   </Avatar>
                   <div>

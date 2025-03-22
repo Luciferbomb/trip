@@ -80,18 +80,23 @@ const Login = () => {
   
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-blue-600 to-indigo-700">
-      {/* Background Elements */}
-      <div className="absolute top-0 left-0 w-full h-full pointer-events-none">
-        <div className="absolute top-1/4 left-1/4 w-64 h-64 bg-blue-500 rounded-full opacity-20 filter blur-3xl animate-pulse"></div>
-        <div className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-indigo-600 rounded-full opacity-20 filter blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+      {/* Background Elements - Enhanced with more dynamic elements */}
+      <div className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-hidden">
+        <div className="absolute top-1/4 left-1/4 w-72 h-72 bg-blue-500 rounded-full opacity-20 filter blur-3xl animate-pulse"></div>
+        <div className="absolute bottom-1/4 right-1/4 w-96 h-96 bg-indigo-600 rounded-full opacity-20 filter blur-3xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+        
+        {/* Additional decorative elements */}
+        <div className="absolute top-1/3 right-1/4 w-48 h-48 bg-purple-500 rounded-full opacity-10 filter blur-3xl animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+        <div className="absolute bottom-1/3 left-1/3 w-60 h-60 bg-blue-400 rounded-full opacity-10 filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
       
       {/* Content Container */}
       <div className="flex-1 flex flex-col items-center justify-center px-4 py-12 relative z-10">
-        {/* Logo and App Name */}
-        <div className="flex items-center mb-8 fade-in-up visible">
-          <Globe className="h-12 w-12 mr-3 text-white" />
-          <h1 className="text-5xl font-bold text-white">
+        {/* Logo and App Name with enhanced animation */}
+        <div className="flex items-center mb-8 fade-in-up visible relative group">
+          <div className="absolute -inset-4 rounded-full bg-white/5 opacity-0 group-hover:opacity-100 blur-xl transition-all duration-700"></div>
+          <Globe className="h-12 w-12 mr-3 text-white relative z-10" />
+          <h1 className="text-5xl font-bold text-white relative z-10 animated-gradient-text">
             Hireyth
           </h1>
         </div>
@@ -104,16 +109,16 @@ const Login = () => {
           Sign in to continue your journey and connect with fellow travelers
         </p>
         
-        {/* Login Form Card */}
+        {/* Login Form Card - Enhanced with glassmorphism */}
         <div className="w-full max-w-md fade-in-up visible" style={{ transitionDelay: '250ms' }}>
           {error && (
-            <Alert variant="destructive" className="mb-6 bg-red-500/20 border-red-500/30 text-white">
+            <Alert variant="destructive" className="mb-6 glassmorphism-card bg-red-500/10 border-red-400/30 text-white">
               <AlertCircle className="h-4 w-4" />
               <AlertDescription>{error}</AlertDescription>
             </Alert>
           )}
           
-          <div className="bg-white/10 backdrop-blur-sm rounded-2xl shadow-xl p-8 border border-white/10">
+          <div className="glassmorphism-card p-8">
             <Form {...form}>
               <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-5">
                 <FormField
@@ -130,7 +135,7 @@ const Login = () => {
                           <Input
                             placeholder="Enter your email"
                             className={cn(
-                              "bg-white/10 border-white/20 text-white pl-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg",
+                              "glass-button pl-10 h-12 placeholder:text-white/40 text-white focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 modern-focus rounded-lg",
                               form.formState.errors.email && "border-red-400"
                             )}
                             {...field}
@@ -157,14 +162,14 @@ const Login = () => {
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             className={cn(
-                              "bg-white/10 border-white/20 text-white pl-10 pr-10 h-12 placeholder:text-white/40 focus:border-white focus-visible:ring-1 focus-visible:ring-white rounded-lg",
+                              "glass-button pl-10 pr-10 h-12 placeholder:text-white/40 text-white focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 modern-focus rounded-lg",
                               form.formState.errors.password && "border-red-400"
                             )}
                             {...field}
                           />
                           <button
                             type="button"
-                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white/90"
+                            className="absolute right-3 top-1/2 transform -translate-y-1/2 text-white/60 hover:text-white/90 transition-colors"
                             onClick={() => setShowPassword(!showPassword)}
                           >
                             {showPassword ? (
@@ -188,7 +193,8 @@ const Login = () => {
                 
                 <Button
                   type="submit"
-                  className="w-full bg-blue-600 text-white hover:bg-blue-700 font-semibold text-lg h-12 shadow-lg hover:shadow-xl transition-all shadow-black/20 rounded-lg mt-2"
+                  variant="sleek"
+                  className="w-full font-semibold text-lg h-12 rounded-lg mt-2 relative overflow-hidden group"
                   disabled={isLoading}
                 >
                   {isLoading ? (
@@ -197,9 +203,9 @@ const Login = () => {
                       <span>Signing in...</span>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center">
+                    <div className="flex items-center justify-center relative z-10">
                       <span>Sign In</span>
-                      <ArrowRight className="ml-2 h-5 w-5" />
+                      <ArrowRight className="ml-2 h-5 w-5 group-hover:translate-x-1 transition-transform duration-300" />
                     </div>
                   )}
                 </Button>
@@ -207,31 +213,31 @@ const Login = () => {
             </Form>
           </div>
           
-          {/* Feature highlights */}
+          {/* Feature highlights with enhanced glassmorphism */}
           <div className="grid grid-cols-3 gap-4 mt-8 px-4">
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10 flex items-center justify-center group relative">
-              <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center">
+            <div className="glassmorphism-card p-4 flex items-center justify-center group relative hover:scale-105 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                 <UsersRound className="w-5 h-5 text-white" />
               </div>
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 text-sm font-medium text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
                 Connect with travelers
               </div>
             </div>
             
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10 flex items-center justify-center group relative">
-              <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center">
+            <div className="glassmorphism-card p-4 flex items-center justify-center group relative hover:scale-105 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                 <MapPin className="w-5 h-5 text-white" />
               </div>
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 text-sm font-medium text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
                 Discover adventures
               </div>
             </div>
             
-            <div className="bg-white/10 backdrop-blur-sm rounded-lg p-4 border border-white/10 flex items-center justify-center group relative">
-              <div className="w-10 h-10 bg-blue-500/30 rounded-full flex items-center justify-center">
+            <div className="glassmorphism-card p-4 flex items-center justify-center group relative hover:scale-105 transition-all duration-300">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center shadow-lg">
                 <CompassIcon className="w-5 h-5 text-white" />
               </div>
-              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white rounded-lg px-3 py-1.5 text-sm font-medium text-gray-900 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
+              <div className="absolute -top-12 left-1/2 -translate-x-1/2 bg-white/10 backdrop-blur-md rounded-lg px-3 py-1.5 text-sm font-medium text-white border border-white/20 opacity-0 group-hover:opacity-100 transition-opacity duration-200 whitespace-nowrap shadow-lg">
                 Explore the world
               </div>
             </div>
@@ -240,7 +246,7 @@ const Login = () => {
           <div className="mt-6 text-center pb-6">
             <p className="text-white/80 text-sm">
               Don't have an account yet?{" "}
-              <Link to="/signup" className="text-white hover:underline font-medium">
+              <Link to="/signup" className="text-white hover:text-blue-300 font-medium transition-colors">
                 Sign up
               </Link>
             </p>

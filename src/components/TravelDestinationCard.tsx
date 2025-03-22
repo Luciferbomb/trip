@@ -66,7 +66,7 @@ export function TravelDestinationCard({
             <span>{location}</span>
           </div>
           
-          {creatorName && creatorUsername && (
+          {creatorName && creatorUsername && creatorId && (
             <Link 
               to={`/profile/${creatorUsername}`}
               onClick={(e) => e.stopPropagation()}
@@ -75,11 +75,22 @@ export function TravelDestinationCard({
               <Avatar className="h-5 w-5 border border-gray-200">
                 <AvatarImage src={creatorImage} />
                 <AvatarFallback className="bg-blue-100 text-blue-600 text-xs">
-                  {creatorName[0]}
+                  {creatorName && creatorName.length > 0 ? creatorName[0] : '?'}
                 </AvatarFallback>
               </Avatar>
               <span>{creatorName}</span>
             </Link>
+          )}
+          {/* Anonymous creator fallback */}
+          {(!creatorName || !creatorUsername || !creatorId) && creatorName && (
+            <div className="flex items-center gap-1.5 text-xs text-gray-500">
+              <Avatar className="h-5 w-5 border border-gray-200 bg-gray-100">
+                <AvatarFallback className="bg-gray-100 text-gray-500 text-xs">
+                  <User size={12} />
+                </AvatarFallback>
+              </Avatar>
+              <span>{creatorName}</span>
+            </div>
           )}
         </div>
         
