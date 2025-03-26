@@ -57,9 +57,6 @@ import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import { BottomNav } from './components/BottomNav';
-import ChatDemo from './pages/ChatDemo';
-import Debug from './pages/debug';
-import UIShowcase from './pages/ui-showcase';
 import AdminPanel from "./pages/AdminPanel";
 
 // Create a client for react-query
@@ -522,21 +519,6 @@ const AppRoutes = () => {
                 <Search />
               </PageTransition>
             </ProtectedRoute>
-          } />
-          <Route path="/chat-demo" element={
-            <PageTransition>
-              <ChatDemo />
-            </PageTransition>
-          } />
-          <Route path="/debug" element={
-            <PageTransition>
-              <Debug />
-            </PageTransition>
-          } />
-          <Route path="/ui-showcase" element={
-            <PageTransition>
-              <UIShowcase />
-            </PageTransition>
           } />
           <Route path="/admin" element={
             <ProtectedRoute>

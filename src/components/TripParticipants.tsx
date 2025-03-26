@@ -93,12 +93,12 @@ const TripParticipants = ({
           filter: `trip_id=eq.${tripId}`
         },
         (payload) => {
-          console.log('Participant change detected:', payload);
+          // Participant change detected, refresh data
           fetchParticipants();
         }
       )
       .subscribe((status) => {
-        console.log('Subscription status:', status);
+        // Subscription status updated
       });
       
     subscriptionRef.current = channel;
@@ -115,7 +115,7 @@ const TripParticipants = ({
           filter: `id=eq.${tripId}`
         },
         (payload) => {
-          console.log('Trip data updated:', payload);
+          // Trip data updated, update available spots
           if (payload.new && payload.new.spots) {
             setSpotsAvailable(payload.new.spots - (payload.new.spots_filled || 0));
           }
@@ -137,7 +137,6 @@ const TripParticipants = ({
         .single();
         
       if (tripError) {
-        console.error('Error fetching trip data:', tripError);
         toast({
           title: 'Error',
           description: 'Could not verify trip data',
@@ -227,7 +226,7 @@ const TripParticipants = ({
 
   const handleUpdateStatus = (participantId: string, newStatus: string) => {
     // Validate before approving
-    if (newStatus === 'approve') {
+    if (newStatus === 'approved') {
       // Check if there are spots available
       if (spotsAvailable <= 0) {
         toast({
@@ -241,65 +240,6 @@ const TripParticipants = ({
     
     // Call the parent action handler
     onAction(participantId, newStatus as 'approve' | 'reject' | 'remove');
-  };
-
-  const testApprovalSystem = async () => {
-    if (!tripId) {
-      toast({
-        title: "Error",
-        description: "No trip ID provided",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    try {
-      toast({
-        title: "Testing Approval System",
-        description: "Checking database connections..."
-      });
-
-      // Test database connection first
-      const { data: testData, error: testError } = await supabase
-        .from('trip_participants')
-        .select('id, status, user_id')
-        .eq('trip_id', tripId)
-        .limit(5);
-
-      if (testError) {
-        console.error('Error testing trip_participants:', testError);
-        toast({
-          title: "Database Error",
-          description: testError.message || "Could not access participants table",
-          variant: "destructive"
-        });
-        return;
-      }
-
-      // Log what we found
-      console.log(`Found ${testData.length} participants for trip ${tripId}:`, testData);
-      
-      toast({
-        title: "Approval System OK",
-        description: `Found ${testData.length} participants for this trip`
-      });
-      
-      if (testData.length > 0) {
-        // Log the first participant's status
-        console.log('Participant status example:', {
-          participant_id: testData[0].id,
-          status: testData[0].status,
-          user_id: testData[0].user_id
-        });
-      }
-    } catch (error) {
-      console.error('Error testing approval system:', error);
-      toast({
-        title: "Test Failed",
-        description: "Could not test approval system. See console for details.",
-        variant: "destructive"
-      });
-    }
   };
 
   if (loading && participants.length === 0) {
@@ -503,20 +443,6 @@ const TripParticipants = ({
         <div className="text-center py-8">
           <p className="text-gray-500 mb-2">No participants yet</p>
           <p className="text-sm text-gray-400">Share your trip to get people to join!</p>
-        </div>
-      )}
-
-      {process.env.NODE_ENV === 'development' && (
-        <div className="mt-4 pt-4 border-t">
-          <p className="text-xs text-gray-500 mb-2">Debug Tools</p>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={testApprovalSystem}
-            className="w-full text-xs"
-          >
-            Test Approval System
-          </Button>
         </div>
       )}
     </div>

@@ -32,7 +32,6 @@ import TripDiscussion from '@/components/TripDiscussion';
 import { getUserTripStatus, updateParticipantStatus, checkTripAvailability } from '@/lib/dbFunctions';
 import TripParticipants from '@/components/TripParticipants';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
-import { runChatTest } from '@/lib/chat-db-test';
 import Chat from '@/components/Chat';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
@@ -701,35 +700,6 @@ const TripDetails = () => {
               </div>
             )}
           </div>
-
-          {/* Add near the trip action buttons (after Delete Trip button and before TripDiscussion component) */}
-          {process.env.NODE_ENV === 'development' && user && (
-            <div className="mt-4 mb-4">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-sm">Database Test</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      toast({
-                        title: "Running Chat DB Test",
-                        description: "Check the console for results"
-                      });
-                      if (id && user?.id) {
-                        runChatTest(id, user.id);
-                      }
-                    }}
-                    className="w-full"
-                  >
-                    Test Chat Database
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
-          )}
         </div>
       )}
 
