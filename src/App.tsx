@@ -525,6 +525,13 @@ const AppRoutes = () => {
               <AdminPanel />
             </ProtectedRoute>
           } />
+          <Route path="/notifications" element={
+            <ProtectedRoute>
+              <PageTransition>
+                <Notifications />
+              </PageTransition>
+            </ProtectedRoute>
+          } />
           <Route path="*" element={
             <PageTransition>
               <NotFound />

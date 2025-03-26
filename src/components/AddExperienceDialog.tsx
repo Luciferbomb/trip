@@ -11,12 +11,16 @@ import { MapPin, Upload, Loader2, ArrowLeft, X, Camera, ArrowRight } from 'lucid
 import MapboxSearch from '@/components/MapboxSearch';
 
 interface AddExperienceDialogProps {
-  isOpen: boolean;
-  onClose: () => void;
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
   onExperienceAdded: () => void;
 }
 
-const AddExperienceDialog: React.FC<AddExperienceDialogProps> = ({ isOpen, onClose, onExperienceAdded }) => {
+const AddExperienceDialog: React.FC<AddExperienceDialogProps> = ({ 
+  open, 
+  onOpenChange, 
+  onExperienceAdded 
+}) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
@@ -172,7 +176,7 @@ const AddExperienceDialog: React.FC<AddExperienceDialogProps> = ({ isOpen, onClo
       
       // Notify parent component
       onExperienceAdded();
-      onClose();
+      onOpenChange(false);
       
     } catch (error: any) {
       console.error('Error adding experience:', error);
@@ -187,7 +191,7 @@ const AddExperienceDialog: React.FC<AddExperienceDialogProps> = ({ isOpen, onClo
   };
   
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl h-[90vh] p-0 overflow-hidden flex flex-col">
         {/* Header */}
         <div className="bg-white sticky top-0 z-50 border-b border-gray-200 flex-shrink-0">
@@ -196,11 +200,11 @@ const AddExperienceDialog: React.FC<AddExperienceDialogProps> = ({ isOpen, onClo
               variant="ghost" 
               size="icon" 
               className="mr-3 text-gray-600 hover:text-gray-900" 
-              onClick={onClose}
+              onClick={() => onOpenChange(false)}
             >
-              <X className="w-5 h-5" />
+              <ArrowLeft className="h-5 w-5" />
             </Button>
-            <h1 className="text-xl font-semibold text-gray-900">Create Event</h1>
+            <h2 className="text-lg font-semibold text-gray-900">Add Experience</h2>
           </div>
         </div>
 

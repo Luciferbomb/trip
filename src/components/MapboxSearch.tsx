@@ -7,24 +7,37 @@ import { Search, MapPin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface MapboxSearchProps {
-  onLocationSelect: (location: {
+  onLocationSelect?: (location: {
     name: string;
     coordinates: [number, number];
     country: string;
   }) => void;
+  onPlaceSelect?: (place: {
+    place_name: string;
+    center: [number, number];
+  }) => void;
   className?: string;
+  placeholder?: string;
+  inputClassName?: string;
 }
 
-const MapboxSearch: React.FC<MapboxSearchProps> = ({ onLocationSelect, className }) => {
+const MapboxSearch: React.FC<MapboxSearchProps> = ({ 
+  onLocationSelect, 
+  onPlaceSelect,
+  className,
+  placeholder = "Search for a city...",
+  inputClassName
+}) => {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
   const marker = useRef<mapboxgl.Marker | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [predictions, setPredictions] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const showMap = !!onLocationSelect; // Only show map if onLocationSelect is provided
 
   useEffect(() => {
-    if (!mapContainer.current) return;
+    if (!mapContainer.current || !showMap) return;
 
     mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
     
@@ -56,7 +69,7 @@ const MapboxSearch: React.FC<MapboxSearchProps> = ({ onLocationSelect, className
         map.current.remove();
       }
     };
-  }, []);
+  }, [showMap]);
 
   const searchLocation = async () => {
     if (!searchQuery.trim()) {
@@ -116,7 +129,14 @@ const MapboxSearch: React.FC<MapboxSearchProps> = ({ onLocationSelect, className
   }, [searchQuery]);
 
   const handleLocationSelect = (place: any, country?: string) => {
-    if (!map.current || !marker.current) return;
+    if (onPlaceSelect) {
+      onPlaceSelect(place);
+      setSearchQuery('');
+      setPredictions([]);
+      return;
+    }
+
+    if (!onLocationSelect || !map.current || !marker.current) return;
 
     const coordinates = place.center as [number, number];
     const locationName = place.text;
@@ -151,10 +171,10 @@ const MapboxSearch: React.FC<MapboxSearchProps> = ({ onLocationSelect, className
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
           <Input
             type="text"
-            placeholder="Search for a city..."
+            placeholder={placeholder}
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
+            className={cn("pl-10", inputClassName)}
           />
         </div>
 
@@ -176,11 +196,13 @@ const MapboxSearch: React.FC<MapboxSearchProps> = ({ onLocationSelect, className
         )}
       </div>
 
-      {/* Map container */}
-      <div 
-        ref={mapContainer} 
-        className="w-full h-[300px] rounded-lg border border-gray-200 overflow-hidden"
-      />
+      {/* Map container - only show if onLocationSelect is provided */}
+      {showMap && (
+        <div 
+          ref={mapContainer} 
+          className="w-full h-[300px] rounded-lg border border-gray-200 overflow-hidden"
+        />
+      )}
     </div>
   );
 };

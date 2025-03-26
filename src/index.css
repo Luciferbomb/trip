@@ -1,4 +1,5 @@
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap');
 
 @tailwind base;
 @tailwind components;
@@ -6,11 +7,11 @@
 
 @layer base {
   :root {
-    --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --background: 210 50% 98%;
+    --foreground: 224 71% 4%;
 
-    /* Updated to a more vibrant blue theme */
-    --primary: 210 100% 50%;
+    /* Vibrant blue and purple theme */
+    --primary: 265 89% 60%; /* More purple */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 210 40% 96%;
@@ -19,24 +20,24 @@
     --muted: 210 40% 96%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 210 40% 96%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 262 83% 58%; /* More vibrant purple */
+    --accent-foreground: 210 40% 98%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 210 100% 50%;
+    --ring: 262 83% 58%; /* Match accent */
 
-    --radius: 0.5rem;
+    --radius: 0.75rem; /* Slightly larger radius */
 
-    /* Updated hireyth colors to blue theme */
-    --hireyth-main: 202 96% 48%;
-    --hireyth-dark: 217 90% 40%;
-    --hireyth-light: 202 96% 60%;
-    --hireyth-light-orange: 210 100% 68%;
-    --hireyth-lightest-blue: 210 100% 94%;
+    /* Updated hireyth colors to vibrant blue-purple theme */
+    --hireyth-main: 262 83% 58%; /* Main purple */
+    --hireyth-dark: 240 64% 45%; /* Dark blue-purple */
+    --hireyth-light: 255 89% 66%; /* Light purple */
+    --hireyth-light-orange: 262 83% 70%; /* Light purple */
+    --hireyth-lightest-blue: 255 100% 94%; /* Very light purple */
 
     /* Card colors */
     --card: 0 0% 100%;
@@ -46,50 +47,50 @@
     --popover: 0 0% 100%;
     --popover-foreground: 222.2 84% 4.9%;
     
-    /* Sidebar colors - updated to blue theme */
-    --sidebar-background: 210 40% 96%;
-    --sidebar-foreground: 202 96% 48%;
-    --sidebar-muted: 210 40% 96%;
+    /* Sidebar colors - updated to purple theme */
+    --sidebar-background: 260 40% 96%;
+    --sidebar-foreground: 262 83% 58%;
+    --sidebar-muted: 260 40% 96%;
     --sidebar-muted-foreground: 215.4 16.3% 46.9%;
     --sidebar-card: 0 0% 100%;
     --sidebar-card-foreground: 222.2 84% 4.9%;
-    --sidebar-border: 220 13% 91%;
-    --sidebar-ring: 217.2 91.2% 59.8%;
+    --sidebar-border: 260 13% 91%;
+    --sidebar-ring: 262 83% 58%;
     
-    /* Blue Theme Color Palette - enhanced for more vibrant blues */
-    --primary-blue-50: hsl(210, 100%, 97%);
-    --primary-blue-100: hsl(210, 100%, 94%);
-    --primary-blue-200: hsl(210, 100%, 88%);
-    --primary-blue-300: hsl(210, 100%, 80%);
-    --primary-blue-400: hsl(210, 100%, 68%);
-    --primary-blue-500: hsl(210, 100%, 56%);
-    --primary-blue-600: hsl(210, 100%, 50%);
-    --primary-blue-700: hsl(217, 90%, 40%); /* Our main dark blue color */
-    --primary-blue-800: hsl(217, 90%, 30%);
-    --primary-blue-900: hsl(217, 90%, 20%);
+    /* Purple-Blue Theme Color Palette */
+    --primary-blue-50: hsl(255, 100%, 97%);
+    --primary-blue-100: hsl(255, 100%, 94%);
+    --primary-blue-200: hsl(255, 100%, 88%);
+    --primary-blue-300: hsl(258, 100%, 80%);
+    --primary-blue-400: hsl(260, 89%, 70%);
+    --primary-blue-500: hsl(262, 83%, 58%); /* Main purple */
+    --primary-blue-600: hsl(265, 89%, 54%);
+    --primary-blue-700: hsl(266, 64%, 45%); /* Darker purple */
+    --primary-blue-800: hsl(267, 55%, 35%);
+    --primary-blue-900: hsl(268, 56%, 25%);
     
-    --accent-indigo-500: hsl(230, 80%, 60%);
-    --accent-indigo-600: hsl(230, 80%, 50%);
-    --accent-indigo-700: hsl(230, 80%, 40%);
+    --accent-indigo-500: hsl(240, 79%, 60%);
+    --accent-indigo-600: hsl(240, 80%, 54%);
+    --accent-indigo-700: hsl(240, 64%, 45%);
     
-    --neutral-50: #f9fafb;
-    --neutral-100: #f3f4f6;
-    --neutral-200: #e5e7eb;
-    --neutral-300: #d1d5db;
-    --neutral-400: #9ca3af;
-    --neutral-500: #6b7280;
-    --neutral-600: #4b5563;
-    --neutral-700: #374151;
-    --neutral-800: #1f2937;
-    --neutral-900: #111827;
+    --neutral-50: #f8fafc;
+    --neutral-100: #f1f5f9;
+    --neutral-200: #e2e8f0;
+    --neutral-300: #cbd5e1;
+    --neutral-400: #94a3b8;
+    --neutral-500: #64748b;
+    --neutral-600: #475569;
+    --neutral-700: #334155;
+    --neutral-800: #1e293b;
+    --neutral-900: #0f172a;
   }
 
   .dark {
     --background: 222.2 84% 4.9%;
     --foreground: 210 40% 98%;
 
-    /* Updated dark theme with blue emphasis */
-    --primary: 210 100% 60%;
+    /* Updated dark theme with purple emphasis */
+    --primary: 265 89% 65%; /* Bright purple for dark theme */
     --primary-foreground: 210 40% 98%;
 
     --secondary: 217.2 32.6% 17.5%;
@@ -98,7 +99,7 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 217.2 32.6% 17.5%;
+    --accent: 262 83% 68%; /* Vibrant purple */
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
@@ -106,7 +107,7 @@
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 210 100% 60%;
+    --ring: 262 83% 65%;
 
     /* Dark theme card */
     --card: 222.2 84% 4.9%;
@@ -126,13 +127,13 @@
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
-    background-color: #f8fafc;
-    color: #334155;
-    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
+    background-color: var(--neutral-50);
+    color: var(--neutral-800);
+    font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   }
   
   ::selection {
-    @apply bg-hireyth-blue/20 text-hireyth-blue;
+    @apply bg-primary/20 text-primary;
   }
 }
 
@@ -145,29 +146,29 @@
     clip-path: inset(0 round 16px);
   }
   
-  /* Glassmorphism classes */
+  /* Enhanced Glassmorphism classes */
   .glass-card {
-    @apply bg-white/80 backdrop-blur-md border border-white/20 shadow-xl;
-    box-shadow: 0 8px 32px rgba(0, 31, 63, 0.07);
+    @apply bg-white/80 backdrop-blur-xl border border-white/30 shadow-xl;
+    box-shadow: 0 10px 40px -10px rgba(0, 0, 0, 0.1);
   }
   
   .glass-dark {
-    @apply bg-slate-900/80 backdrop-blur-md border border-slate-700/30 text-white shadow-xl;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    @apply bg-slate-900/80 backdrop-blur-xl border border-slate-700/40 text-white shadow-xl;
+    box-shadow: 0 10px 40px -5px rgba(0, 0, 0, 0.3);
   }
   
   .glass-button {
-    @apply bg-white/20 hover:bg-white/30 backdrop-blur-md border border-white/30 text-white transition-all duration-300;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    @apply bg-white/25 hover:bg-white/35 backdrop-blur-xl border border-white/40 text-white transition-all duration-300;
+    box-shadow: 0 6px 15px -5px rgba(0, 0, 0, 0.15);
   }
   
   /* Enhanced input field styling for better visibility */
   input.glass-button, 
   input.glass-button:focus,
   input.glass-button:active {
-    @apply bg-white/10 backdrop-blur-md border border-white/40 text-white;
+    @apply bg-white/15 backdrop-blur-xl border border-white/50 text-white;
     text-shadow: 0 0 1px rgba(255, 255, 255, 0.5);
-    box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.1), 0 4px 12px rgba(0, 0, 0, 0.1);
+    box-shadow: inset 0 2px 3px rgba(0, 0, 0, 0.1), 0 6px 15px -5px rgba(0, 0, 0, 0.15);
   }
   
   input.glass-button::placeholder {
@@ -176,13 +177,13 @@
   }
   
   .glass-button-dark {
-    @apply bg-slate-800/70 hover:bg-slate-800/90 backdrop-blur-md border border-slate-700/50 text-white transition-all duration-300;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    @apply bg-slate-800/70 hover:bg-slate-800/90 backdrop-blur-xl border border-slate-700/50 text-white transition-all duration-300;
+    box-shadow: 0 6px 15px -5px rgba(0, 0, 0, 0.2);
   }
   
-  /* Modern button styles */
+  /* Modern button styles - updated */
   .modern-button {
-    @apply rounded-md px-4 py-2 font-medium transition-all duration-300 relative overflow-hidden shadow-md;
+    @apply rounded-xl px-5 py-2.5 font-medium transition-all duration-300 relative overflow-hidden shadow-lg;
   }
   
   .modern-button::before {
@@ -192,7 +193,7 @@
     left: -100%;
     width: 100%;
     height: 100%;
-    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
     transition: all 0.6s;
   }
   
@@ -201,47 +202,48 @@
   }
   
   .modern-button-primary {
-    @apply bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700;
+    @apply bg-gradient-to-br from-primary to-accent text-white font-semibold;
   }
   
   .modern-button-secondary {
-    @apply bg-white text-gray-800 hover:bg-gray-100 border border-gray-200;
+    @apply bg-white text-primary border border-primary/20 shadow-md hover:shadow-lg hover:border-primary/40;
   }
   
   .modern-button-ghost {
-    @apply bg-transparent hover:bg-white/10 text-current border border-transparent;
+    @apply bg-transparent hover:bg-primary/10 text-primary border border-primary/20 shadow-sm hover:shadow-md;
   }
   
-  /* Card styles */
+  /* Modern card styles - updated */
   .modern-card {
-    @apply rounded-xl overflow-hidden transition-all duration-300;
-    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.01);
+    @apply rounded-2xl bg-white border border-neutral-200/80 shadow-sm hover:shadow-md transition-all duration-300;
+    box-shadow: 0 4px 20px -8px rgba(0, 0, 0, 0.1);
   }
   
   .modern-card:hover {
-    box-shadow: 0 20px 35px -10px rgba(0, 0, 0, 0.1), 0 10px 15px -5px rgba(0, 0, 0, 0.05);
+    box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.15);
     transform: translateY(-2px);
   }
   
+  /* Utility classes */
   .hover-scale {
-    @apply transition-transform duration-500 ease-out hover:scale-[1.02];
+    @apply transition-transform duration-300 hover:scale-[1.02];
   }
   
   .subtle-shadow {
-    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.04);
+    box-shadow: 0 5px 20px -5px rgba(0, 0, 0, 0.08);
   }
   
   .card-shadow {
-    box-shadow: 0 20px 40px -20px rgba(0, 0, 0, 0.1), 0 0 15px rgba(0, 0, 0, 0.03);
+    box-shadow: 0 10px 30px -12px rgba(0, 0, 0, 0.1);
   }
   
   .hero-text-shadow {
-    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.08);
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.15);
   }
   
-  /* Custom Transitions */
+  /* Page transitions */
   .page-transition {
-    @apply transition-all duration-500 ease-out;
+    @apply transition-opacity duration-300;
   }
   
   .fade-enter {
@@ -249,7 +251,7 @@
   }
   
   .fade-enter-active {
-    @apply opacity-100 transition-opacity duration-300 ease-out;
+    @apply opacity-100 transition-opacity duration-300;
   }
   
   .fade-exit {
@@ -257,25 +259,31 @@
   }
   
   .fade-exit-active {
-    @apply opacity-0 transition-opacity duration-300 ease-out;
+    @apply opacity-0 transition-opacity duration-300;
   }
   
-  /* Gradient borders */
+  /* Gradient border */
   .gradient-border {
     position: relative;
-    border-radius: 0.5rem;
-    padding: 2px;
+    @apply rounded-xl p-[1px] bg-transparent;
   }
   
   .gradient-border::before {
     content: "";
     position: absolute;
     inset: 0;
-    border-radius: 0.5rem;
-    padding: 2px;
-    background: linear-gradient(45deg, #60a5fa, #818cf8, #8b5cf6, #4f46e5);
+    border-radius: inherit;
+    padding: 1px;
+    background: linear-gradient(
+      to right bottom,
+      theme('colors.purple.500'),
+      theme('colors.indigo.500')
+    );
     -webkit-mask: 
-      linear-gradient(#fff 0 0) content-box, 
+      linear-gradient(#fff 0 0) content-box,
+      linear-gradient(#fff 0 0);
+    mask: 
+      linear-gradient(#fff 0 0) content-box,
       linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
     mask-composite: exclude;
@@ -283,7 +291,61 @@
   
   /* Gradient text */
   .gradient-text {
-    @apply bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600;
+    @apply bg-clip-text text-transparent bg-gradient-to-r from-primary to-accent;
+  }
+  
+  /* New: Enhanced Neumorphic Styles */
+  .neumorphic {
+    @apply bg-neutral-50 rounded-2xl p-4;
+    box-shadow: 
+      8px 8px 16px rgba(0, 0, 0, 0.05),
+      -8px -8px 16px rgba(255, 255, 255, 0.8);
+  }
+  
+  .neumorphic-inset {
+    @apply bg-neutral-50 rounded-2xl p-4;
+    box-shadow: 
+      inset 4px 4px 8px rgba(0, 0, 0, 0.05),
+      inset -4px -4px 8px rgba(255, 255, 255, 0.8);
+  }
+  
+  .neumorphic-button {
+    @apply bg-neutral-50 rounded-xl px-5 py-2.5 font-medium transition-all duration-200;
+    box-shadow: 
+      5px 5px 10px rgba(0, 0, 0, 0.05),
+      -5px -5px 10px rgba(255, 255, 255, 0.8);
+  }
+  
+  .neumorphic-button:active {
+    box-shadow: 
+      inset 3px 3px 6px rgba(0, 0, 0, 0.05),
+      inset -3px -3px 6px rgba(255, 255, 255, 0.8);
+  }
+  
+  /* New: Enhanced Card Styles */
+  .premium-card {
+    @apply relative rounded-2xl overflow-hidden transition-all duration-300;
+    background: linear-gradient(135deg, #f5f7fa 0%, #ffffff 100%);
+    box-shadow: 
+      0 10px 30px -15px rgba(0, 0, 0, 0.15),
+      0 1px 2px rgba(0, 0, 0, 0.05);
+  }
+  
+  .premium-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 6px;
+    background: linear-gradient(90deg, theme('colors.purple.500'), theme('colors.indigo.500'));
+  }
+  
+  .premium-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 
+      0 20px 40px -20px rgba(var(--primary-rgb), 0.2),
+      0 1px 3px rgba(0, 0, 0, 0.1);
   }
 }
 

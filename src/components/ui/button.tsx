@@ -27,6 +27,9 @@ const buttonVariants = cva(
         modern: "bg-gradient-to-r from-blue-600 to-indigo-600 text-white hover:from-blue-700 hover:to-indigo-700 shadow-md transition-all duration-300",
         "modern-outline": "border-2 border-blue-500 text-blue-600 hover:bg-blue-50 transition-all duration-300",
         sleek: "relative overflow-hidden bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md hover:shadow-lg transition-all duration-300 after:absolute after:inset-0 after:z-[-1] after:opacity-0 after:bg-gradient-to-r after:from-indigo-600 after:to-blue-600 hover:after:opacity-100 after:transition-opacity after:duration-500",
+        brand: "bg-gradient-to-r from-purple-500 to-indigo-600 text-white hover:from-purple-600 hover:to-indigo-700 shadow-md transition-all duration-300",
+        "brand-outline": "border-2 border-purple-500 text-purple-600 hover:bg-purple-50 transition-all duration-300",
+        "brand-soft": "bg-purple-100 text-purple-600 hover:bg-purple-200 transition-all duration-300",
       },
       size: {
         default: "h-10 px-4 py-2",
@@ -38,7 +41,7 @@ const buttonVariants = cva(
       },
     },
     defaultVariants: {
-      variant: "default",
+      variant: "brand",
       size: "default",
     },
   }

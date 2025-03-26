@@ -1,10 +1,12 @@
 import React, { useMemo } from 'react';
+import { cn } from '@/lib/utils';
 
 interface InlineVerifiedBadgeProps {
   size?: 'sm' | 'md' | 'lg';
+  className?: string;
 }
 
-export const InlineVerifiedBadge = ({ size = 'md' }: InlineVerifiedBadgeProps) => {
+export const InlineVerifiedBadge = ({ size = 'md', className }: InlineVerifiedBadgeProps) => {
   // Generate a random ID for the gradient to avoid conflicts with multiple instances
   const gradientId = useMemo(() => `badge-gradient-${Math.random().toString(36).substr(2, 9)}`, []);
   
@@ -15,7 +17,7 @@ export const InlineVerifiedBadge = ({ size = 'md' }: InlineVerifiedBadgeProps) =
   };
 
   return (
-    <div className="relative inline-block">
+    <div className={cn("relative inline-block", className)}>
       {/* Add a subtle glow effect */}
       <div className="absolute inset-0 rounded-full bg-purple-500 blur-sm opacity-30"></div>
       <svg 

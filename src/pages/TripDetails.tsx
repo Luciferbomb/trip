@@ -35,6 +35,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import Chat from '@/components/Chat';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
+import { BackgroundGradient } from "@/components/ui/background-gradient";
 
 interface Participant {
   id: string;
@@ -486,7 +487,7 @@ const TripDetails = () => {
         </div>
       ) : error || !trip ? (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center min-h-screen bg-gray-50 pt-16">
-          <div className="bg-white border border-gray-200 p-6 rounded-lg shadow-sm max-w-lg w-full">
+          <BackgroundGradient className="rounded-[22px] bg-white dark:bg-zinc-900 p-6 max-w-lg w-full">
             <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h3 className="text-lg font-bold text-gray-800 mb-2">Trip Not Found</h3>
             <p className="text-gray-600 mb-6">This trip may have been deleted or is no longer active.</p>
@@ -497,209 +498,247 @@ const TripDetails = () => {
               <ChevronLeft className="h-4 w-4" />
               View All Trips
             </Link>
-      </div>
+          </BackgroundGradient>
         </div>
       ) : (
         <div className="max-w-4xl mx-auto px-4">
-      {/* Trip Image */}
-          <div className="relative aspect-[16/9] rounded-xl overflow-hidden shadow-lg mb-6">
-        <img 
-          src={trip.image_url}
-          alt={trip.title} 
-          className="w-full h-full object-cover"
-        />
-            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-            
-            {/* Creator Info - Overlaid on image */}
-            <div className="absolute bottom-4 left-4 flex items-center">
-              <Link to={`/profile/${trip.creator_username}`} className="flex items-center">
-                <img
-                  src={trip.creator_image}
-                  alt={trip.creator_name}
-                  className="w-10 h-10 rounded-full border-2 border-white object-cover"
-                />
-                <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
-              </Link>
-            </div>
-        </div>
-
-          {/* Trip Details */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <div className="flex justify-between items-start mb-4">
-              <h1 className="text-2xl font-bold text-gray-900">{trip.title}</h1>
-              <div className="flex items-center gap-2">
-              <Button 
-                variant="outline" 
-                  size="sm"
-                  onClick={handleShare}
-              >
-                  <Share2 className="w-4 h-4 mr-2" />
-                  Share
-              </Button>
-                {user?.id === trip.creator_id && (
-              <Button 
-                    variant="destructive"
-                    size="sm"
-                onClick={() => setShowDeleteConfirm(true)}
-              >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Delete
-              </Button>
-                )}
-        </div>
-      </div>
-      
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-        <div className="flex items-center text-gray-600 mb-4">
-                  <MapPin className="w-5 h-5 mr-2" />
-          <span>{trip.location}</span>
-        </div>
-        
-                <div className="flex items-center text-gray-600 mb-4">
-                  <Calendar className="w-5 h-5 mr-2" />
-                  <span>
-                    {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
-            </span>
-          </div>
-          
-                <div className="flex items-center text-gray-600">
-                  <Users className="w-5 h-5 mr-2" />
-                  <span>
-                    {participants.filter(p => p.status === 'approved').length} / {trip.spots} spots filled
-            </span>
-          </div>
-        </div>
-        
-            <div>
-                <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-                <p className="text-gray-600">{trip.description}</p>
+          <BackgroundGradient className="rounded-[22px] bg-white dark:bg-zinc-900 overflow-hidden mb-6">
+            {/* Trip Image */}
+            <div className="relative aspect-[16/9] overflow-hidden">
+              <img 
+                src={trip.image_url}
+                alt={trip.title} 
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              
+              {/* Creator Info - Overlaid on image */}
+              <div className="absolute bottom-4 left-4 flex items-center">
+                <Link to={`/profile/${trip.creator_username}`} className="flex items-center">
+                  <Avatar className="h-10 w-10 border-2 border-white">
+                    <AvatarImage 
+                      src={trip.creator_image}
+                      alt={trip.creator_name}
+                      className="object-cover"
+                    />
+                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                      {trip.creator_name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
+                </Link>
               </div>
-          </div>
-          
-            {/* Join/Status Button */}
-            <div className="mt-6 flex justify-center">
-              {user?.id === trip.creator_id ? (
-                <Button
-                  variant="outline"
-                  onClick={() => setShowParticipants(true)}
-                >
-                  <Users className="w-4 h-4 mr-2" />
-                  Manage Participants
-                </Button>
-              ) : userParticipation ? (
-              <Button
-                  variant="outline"
-                  disabled
-                >
-                  {userParticipation.status === 'approved' ? (
-                    <>
-                      <Check className="w-4 h-4 mr-2" />
-                      Joined
-                    </>
-                  ) : userParticipation.status === 'pending' ? (
-                    <>
-                      <Clock className="w-4 h-4 mr-2" />
-                      Request Pending
-                  </>
-                ) : (
-                  <>
-                      <X className="w-4 h-4 mr-2" />
-                      Request Rejected
-                  </>
-                )}
-              </Button>
-              ) : (
-                <Button
-                  onClick={handleJoinTrip}
-                  disabled={joining}
-                >
-                  {joining ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : (
-                    <UserPlus className="w-4 h-4 mr-2" />
-                  )}
-                  Join Trip
-                </Button>
-              )}
             </div>
+
+            {/* Trip Details */}
+            <div className="p-6">
+              <div className="flex justify-between items-start mb-4">
+                <h1 className="text-2xl font-bold text-gray-900">{trip.title}</h1>
+                <div className="flex items-center gap-2">
+                  <Button 
+                    variant="outline" 
+                    size="sm"
+                    onClick={handleShare}
+                  >
+                    <Share2 className="w-4 h-4 mr-2" />
+                    Share
+                  </Button>
+                  {user?.id === trip.creator_id && (
+                    <Button 
+                      variant="destructive"
+                      size="sm"
+                      onClick={() => setShowDeleteConfirm(true)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete
+                    </Button>
+                  )}
+                </div>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <div className="flex items-center text-gray-600 mb-4">
+                    <MapPin className="w-5 h-5 mr-2" />
+                    <span>{trip.location}</span>
+                  </div>
+                  
+                  <div className="flex items-center text-gray-600 mb-4">
+                    <Calendar className="w-5 h-5 mr-2" />
+                    <span>
+                      {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                  
+                  <div className="flex items-center text-gray-600">
+                    <Users className="w-5 h-5 mr-2" />
+                    <span>
+                      {participants.filter(p => p.status === 'approved').length} / {trip.spots} spots filled
+                    </span>
+                  </div>
+                </div>
+                
+                <div>
+                  <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
+                  <p className="text-gray-600">{trip.description}</p>
+                </div>
+              </div>
+            </div>
+          </BackgroundGradient>
+
+          {/* Join/Status Button */}
+          <div className="mt-6 flex justify-center">
+            {user?.id === trip.creator_id ? (
+              <Button
+                variant="outline"
+                onClick={() => setShowParticipants(true)}
+              >
+                <Users className="w-4 h-4 mr-2" />
+                Manage Participants
+              </Button>
+            ) : userParticipation ? (
+            <Button
+                variant="outline"
+                disabled
+              >
+                {userParticipation.status === 'approved' ? (
+                  <>
+                    <Check className="w-4 h-4 mr-2" />
+                    Joined
+                  </>
+                ) : userParticipation.status === 'pending' ? (
+                  <>
+                    <Clock className="w-4 h-4 mr-2" />
+                    Request Pending
+                </>
+              ) : (
+                <>
+                    <X className="w-4 h-4 mr-2" />
+                    Request Rejected
+                </>
+              )}
+            </Button>
+            ) : (
+              <Button
+                onClick={handleJoinTrip}
+                disabled={joining}
+              >
+                {joining ? (
+                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                ) : (
+                  <UserPlus className="w-4 h-4 mr-2" />
+                )}
+                Join Trip
+              </Button>
+            )}
           </div>
 
           {/* Participants Section */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 mb-6">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">Participants</h2>
-            <div className="space-y-4">
-              {participants.filter(p => p.status === 'approved').map((participant) => (
-                <div 
-                  key={participant.id} 
-                  className="flex flex-col sm:flex-row sm:items-center gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors border border-gray-100"
+          {user?.id === trip.creator_id && participants.length > 0 && (
+            <BackgroundGradient className="rounded-[22px] bg-white dark:bg-zinc-900 p-6 mb-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-xl font-bold text-gray-900">Participants</h2>
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  onClick={() => setShowParticipants(true)}
                 >
-                  <Link 
-                    to={`/profile/${participant.user.username}`}
-                    className="flex items-center space-x-3"
-                  >
-                    <Avatar className="h-10 w-10 border border-gray-200 shadow-sm">
-                      <AvatarImage src={participant.user.profile_image} alt={participant.user.name} />
-                      <AvatarFallback className="bg-blue-100 text-blue-800">{participant.user.name[0]}</AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="font-medium text-gray-900">{participant.user.name}</p>
-                      <p className="text-sm text-blue-600">@{participant.user.username}</p>
+                  View All
+                </Button>
+              </div>
+              
+              <div className="space-y-4">
+                {participants.slice(0, 3).map((participant) => (
+                  <div key={participant.id} className="flex items-center justify-between p-3 rounded-lg bg-gray-50/50">
+                    <div className="flex items-center gap-3">
+                      <Avatar className="h-10 w-10 border border-gray-200">
+                        <AvatarImage 
+                          src={participant.user.profile_image} 
+                          alt={participant.user.name}
+                          className="object-cover"
+                        />
+                        <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                          {participant.user.name.charAt(0)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div>
+                        <Link 
+                          to={`/profile/${participant.user.username}`}
+                          className="font-medium text-gray-900 hover:text-blue-600"
+                        >
+                          {participant.user.name}
+                        </Link>
+                        <div className="flex items-center gap-2 mt-0.5">
+                          <Badge 
+                            variant={participant.status === 'approved' ? 'default' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {participant.status}
+                          </Badge>
+                        </div>
+                      </div>
                     </div>
-                  </Link>
-                </div>
-              ))}
-              
-              {participants.filter(p => p.status === 'approved').length === 0 && (
-                <div className="text-center py-8 px-4 border border-dashed border-gray-200 rounded-lg bg-gray-50">
-                  <p className="text-gray-500">No participants yet</p>
-                  <p className="text-sm text-gray-400 mt-1">Share this trip with others to get started</p>
-                </div>
-              )}
-              
-              {participants.filter(p => p.status === 'approved').length > 0 && (
-                <div className="mt-4 text-center">
-            <Button 
-              variant="outline"
-              size="sm"
-              onClick={() => setShowParticipants(true)}
-            >
-                    View All Participants
-            </Button>
-                </div>
-              )}
-            </div>
-          </div>
+                    
+                    {user?.id === trip.creator_id && participant.status === 'pending' && (
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-green-600 hover:text-green-700"
+                          onClick={() => handleParticipantAction(participant.id, 'approve')}
+                          disabled={actionLoading === participant.id}
+                        >
+                          <Check className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="text-red-600 hover:text-red-700"
+                          onClick={() => handleParticipantAction(participant.id, 'reject')}
+                          disabled={actionLoading === participant.id}
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    )}
+                  </div>
+                ))}
+                
+                {participants.length > 3 && (
+                  <Button 
+                    variant="outline" 
+                    className="w-full mt-2"
+                    onClick={() => setShowParticipants(true)}
+                  >
+                    View All {participants.length} Participants
+                  </Button>
+                )}
+              </div>
+            </BackgroundGradient>
+          )}
 
           {/* Discussion Section */}
-          <div className="mt-8">
-            <h3 className="text-xl font-semibold text-gray-800 mb-4 flex items-center gap-2">
-              <MessageCircle className="h-5 w-5 text-gray-600" />
-              Discussion Forum
-            </h3>
-            
-            {!user ? (
-              <Alert variant="destructive">
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Authentication Required</AlertTitle>
-                <AlertDescription>
-                  You need to be logged in to view the discussion.
-                </AlertDescription>
-              </Alert>
-            ) : !isApproved && !(!!trip && user.id === trip.creator_id) ? (
-              <Alert>
-                <AlertCircle className="h-4 w-4" />
-                <AlertTitle>Pending Approval</AlertTitle>
-                <AlertDescription>
-                  You can participate in the discussion once your request to join is approved.
-                </AlertDescription>
-              </Alert>
-            ) : (
-              <div className="bg-white rounded-lg border overflow-hidden">
-                <Chat tripId={id || ''} tripName={trip?.title} />
-              </div>
-            )}
-          </div>
+          {user && (
+            <BackgroundGradient className="rounded-[22px] bg-white dark:bg-zinc-900 p-6">
+              <h2 className="text-xl font-bold text-gray-900 mb-4">Discussion</h2>
+              {user.id === trip.creator_id || isApproved ? (
+                <TripDiscussion 
+                  tripId={trip.id} 
+                  tripName={trip.title}
+                  isCreator={user.id === trip.creator_id}
+                  isApproved={isApproved}
+                />
+              ) : (
+                <Alert variant="default" className="bg-blue-50 border-blue-200">
+                  <AlertCircle className="h-4 w-4 text-blue-600" />
+                  <AlertTitle className="text-blue-800">Join to participate</AlertTitle>
+                  <AlertDescription className="text-blue-700">
+                    You need to join this trip to participate in discussions.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </BackgroundGradient>
+          )}
         </div>
       )}
 

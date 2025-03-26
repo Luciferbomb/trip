@@ -1,21 +1,21 @@
 import React, { useState, useEffect } from 'react';
-import { SearchIcon, Filter, X, ChevronDown, Plus, Calendar, Loader2 } from 'lucide-react';
-import TripCard from '@/components/TripCard';
+import { SearchIcon, Filter, X, ChevronDown, Plus, Calendar, Loader2, MapPin } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/lib/supabase';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
 import {
   Popover,
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover";
-import { format, isWithinInterval, parseISO } from 'date-fns';
+import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
-import EnhancedTripCard from '@/components/EnhancedTripCard';
 import { useToast } from '@/components/ui/use-toast';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { BackgroundGradient } from "@/components/ui/background-gradient";
 
 // List of countries and activities for filters
 const countries = ["All", "Greece", "Japan", "Norway", "Thailand", "USA", "Italy", "France"];
@@ -140,26 +140,6 @@ const Trips = () => {
     
     return searchMatch && countryMatch && activityMatch;
   });
-  
-  // Transform Supabase data to match TripCard props
-  const mapTripToCardProps = (trip: any) => {
-    return {
-      id: trip.id,
-      title: trip.title,
-      location: trip.location,
-      image: trip.image_url || trip.image,
-      startDate: trip.start_date || trip.startDate,
-      endDate: trip.end_date || trip.endDate,
-      spots: trip.spots,
-      spotsFilled: trip.spots_filled || 0,
-      creatorImage: trip.creator_image || trip.creatorImage,
-      creatorName: trip.creator_name || trip.creatorName,
-      creatorId: trip.creator_id || trip.creatorId,
-      activity: trip.activity,
-      country: trip.country,
-      featured: trip.featured
-    };
-  };
   
   // Calculate header height based on filter visibility
   const headerHeight = showFilters ? 270 : 140;
@@ -371,12 +351,65 @@ const Trips = () => {
               )}
             </div>
           ) : (
-            <div className="grid gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {filteredTrips.map((trip) => (
-                <EnhancedTripCard 
-                  key={trip.id}
-                  {...mapTripToCardProps(trip)}
-                />
+                <BackgroundGradient key={trip.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
+                  <div 
+                    className="overflow-hidden cursor-pointer relative"
+                    onClick={() => navigate(`/trips/${trip.id}`)}
+                  >
+                    <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
+                      {trip.image_url ? (
+                        <img 
+                          src={trip.image_url} 
+                          alt={trip.title} 
+                          className="h-full w-full object-cover transition-transform hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
+                          <MapPin className="h-12 w-12 text-purple-300" />
+                        </div>
+                      )}
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
+                        <h3 className="text-lg font-semibold text-white">{trip.title}</h3>
+                        <div className="flex items-center gap-1 text-white/90">
+                          <MapPin className="h-3.5 w-3.5" />
+                          <span className="text-sm">{trip.location}</span>
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Avatar className="h-8 w-8 border border-gray-200">
+                            <AvatarImage 
+                              src={trip.creator_image} 
+                              alt={trip.creator_name}
+                              className="object-cover"
+                            />
+                            <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                              {trip.creator_name.charAt(0)}
+                            </AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-sm font-medium">{trip.creator_name}</p>
+                            <div className="flex items-center gap-1 text-xs text-gray-500">
+                              <Calendar className="h-3.5 w-3.5" />
+                              {format(new Date(trip.start_date), 'MMM d, yyyy')}
+                            </div>
+                          </div>
+                        </div>
+                        
+                        {trip.status && (
+                          <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'} className="text-xs">
+                            {trip.status}
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </BackgroundGradient>
               ))}
             </div>
           )}

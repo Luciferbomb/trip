@@ -316,109 +316,74 @@ const Chat: React.FC<ChatProps> = ({ tripId, tripName = "Trip Discussion" }) => 
   }, []);
   
   return (
-    <div className="flex flex-col h-[60vh] md:h-[500px] rounded-lg overflow-hidden border w-full max-w-full">
-      {/* Chat header */}
-      <div className="bg-white p-3 border-b shadow-sm flex items-center justify-between w-full">
-        <div className="flex items-center gap-3">
-          <Avatar className="h-10 w-10 flex-shrink-0">
-            <AvatarImage src="" alt={tripName} />
-            <AvatarFallback className="bg-blue-600 text-white">
-              {tripName.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-          <div className="min-w-0">
-            <h3 className="font-medium text-gray-900 truncate max-w-[150px] sm:max-w-[200px]">{tripName}</h3>
-            <p className="text-xs text-gray-500">
-              {participants.length} participants
-            </p>
-          </div>
-        </div>
-      </div>
-      
-      {/* Messages area */}
-      <div 
-        ref={chatContainerRef}
-        className="flex-1 overflow-y-auto p-4 bg-gray-100 w-full overflow-x-hidden relative"
-      >
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-700"></div>
-          </div>
-        ) : messages.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-full text-gray-500">
-            <p>No messages yet</p>
-            <p className="text-sm">Be the first to send a message!</p>
-          </div>
-        ) : (
-          <div className="space-y-4 w-full">
-            {messages.map((message) => (
-              <ChatMessage
-                key={message.id}
-                id={message.id}
-                content={message.content}
-                timestamp={message.timestamp}
-                sender={message.sender}
-                isCurrentUser={message.sender.id === user?.id}
-                status="read"
-              />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
-        )}
-        
-        {/* Scroll to bottom button */}
-        {showScrollButton && (
-          <button
-            onClick={scrollToBottom}
-            className="absolute bottom-4 right-4 bg-blue-600 text-white p-2 rounded-full shadow-md z-10 flex items-center justify-center"
-            aria-label="Scroll to bottom"
+    <div className="flex flex-col h-[500px] bg-gray-50/50 rounded-lg">
+      {/* Messages Container */}
+      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        {messages.map((message) => (
+          <div
+            key={message.id}
+            className={`flex items-start gap-3 ${
+              message.sender.id === user?.id ? 'flex-row-reverse' : ''
+            }`}
           >
-            <svg 
-              xmlns="http://www.w3.org/2000/svg" 
-              width="20" 
-              height="20" 
-              viewBox="0 0 24 24" 
-              fill="none" 
-              stroke="currentColor" 
-              strokeWidth="2" 
-              strokeLinecap="round" 
-              strokeLinejoin="round"
+            <Avatar className="h-8 w-8 flex-shrink-0 border border-gray-200">
+              <AvatarImage src={message.sender.avatar} alt={message.sender.name} className="object-cover" />
+              <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                {message.sender.name.charAt(0)}
+              </AvatarFallback>
+            </Avatar>
+            <div
+              className={`flex flex-col ${
+                message.sender.id === user?.id ? 'items-end' : 'items-start'
+              }`}
             >
-              <polyline points="6 9 12 15 18 9"></polyline>
-            </svg>
-          </button>
-        )}
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-medium text-gray-700">
+                  {message.sender.name}
+                </span>
+                <span className="text-xs text-gray-500">
+                  {new Date(message.timestamp).toLocaleTimeString([], {
+                    hour: '2-digit',
+                    minute: '2-digit'
+                  })}
+                </span>
+              </div>
+              <div
+                className={`mt-1 px-4 py-2 rounded-2xl max-w-[80%] ${
+                  message.sender.id === user?.id
+                    ? 'bg-blue-600 text-white rounded-tr-none'
+                    : 'bg-white border border-gray-200 rounded-tl-none'
+                }`}
+              >
+                <p className="text-sm whitespace-pre-wrap">{message.content}</p>
+              </div>
+            </div>
+          </div>
+        ))}
+        <div ref={messagesEndRef} />
       </div>
-      
-      {/* Message input */}
-      <div className="bg-white p-3 border-t w-full">
-        <div className="flex items-end gap-2 w-full">
-          <Button
-            variant="ghost"
-            size="icon"
-            className="rounded-full flex-shrink-0"
-            type="button"
-          >
-            <Paperclip className="h-5 w-5 text-gray-500" />
-          </Button>
-          
+
+      {/* Message Input */}
+      <div className="p-4 border-t border-gray-200 bg-white">
+        <div className="flex items-center gap-2">
           <Textarea
             value={messageText}
             onChange={(e) => setMessageText(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message"
-            className="flex-1 resize-none max-h-32 min-h-10 rounded-full py-2.5 w-full"
-            disabled={isSending}
+            placeholder="Type a message..."
+            className="flex-1 min-h-[44px] max-h-[120px] resize-none bg-gray-50/50 border-gray-200 focus:ring-blue-500 focus:border-blue-500"
+            rows={1}
           />
-          
           <Button
-            type="button"
-            size="icon"
-            className="rounded-full bg-blue-600 hover:bg-blue-700 flex-shrink-0"
             onClick={handleSendMessage}
             disabled={!messageText.trim() || isSending}
+            className="h-11 px-4 bg-blue-600 hover:bg-blue-700 text-white"
           >
-            <SendHorizontal className="h-5 w-5" />
+            {isSending ? (
+              <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+            ) : (
+              <SendHorizontal className="h-5 w-5" />
+            )}
           </Button>
         </div>
       </div>

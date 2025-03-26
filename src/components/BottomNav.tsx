@@ -5,7 +5,8 @@ import { motion } from "framer-motion"
 import { Link } from "react-router-dom"
 import { HireythLogo } from "./HireythLogo"
 import { HireythLogoAnimated } from "./HireythLogoAnimated"
-import { TripIcon, ProfileTravelIcon } from "./TravelIcons"
+import TripAnimatedIcon from "./TripAnimatedIcon"
+import ProfileAnimatedIcon from "./ProfileAnimatedIcon"
 
 interface NavItem {
   icon: React.ReactNode
@@ -27,8 +28,8 @@ export function BottomNav({ className }: BottomNavProps) {
 
   const navItems: NavItem[] = [
     {
-      // Always show Trip icon as active for vibrant gradient
-      icon: <TripIcon size={24} isActive={true} />,
+      // Use TripAnimatedIcon instead of TripIcon
+      icon: <TripAnimatedIcon size="xs" animated={true} isActive={true} />,
       path: "/trips",
     },
     {
@@ -37,8 +38,8 @@ export function BottomNav({ className }: BottomNavProps) {
       isLogo: true
     },
     {
-      // Always show Profile icon as active for vibrant gradient
-      icon: <ProfileTravelIcon size={24} isActive={true} />,
+      // Use new ProfileAnimatedIcon instead of ProfileTravelIcon
+      icon: <ProfileAnimatedIcon size="xs" animated={true} isActive={true} />,
       path: "/profile",
     },
   ]
@@ -46,12 +47,12 @@ export function BottomNav({ className }: BottomNavProps) {
   return (
     <div
       className={cn(
-        "fixed bottom-0 left-0 right-0 z-50 h-14 py-2 px-4 md:hidden",
+        "fixed bottom-0 left-0 right-0 z-50 h-16 py-2 px-4 md:hidden",
         className
       )}
     >
-      {/* Backdrop blur and border */}
-      <div className="absolute inset-0 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-t border-gray-200 dark:border-gray-800 shadow-sm -z-10" />
+      {/* Enhanced backdrop with glass effect */}
+      <div className="absolute inset-0 bg-white/80 dark:bg-gray-900/80 backdrop-blur-xl border-t border-gray-200/50 dark:border-gray-800/50 shadow-lg -z-10" />
       
       {/* Navigation items */}
       <div className="flex items-center justify-around h-full max-w-md mx-auto">
@@ -64,13 +65,13 @@ export function BottomNav({ className }: BottomNavProps) {
               onClick={() => navigate(item.path)}
               className={cn(
                 "relative flex items-center justify-center h-full",
-                "w-14",
+                "w-16",
                 "transition-all duration-300"
               )}
             >
-              {/* Active indicator */}
+              {/* Active indicator - updated for new purple gradient */}
               {isActive && !item.isLogo && (
-                <div className="absolute top-0 inset-x-2 h-0.5 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full" />
+                <div className="absolute top-0 inset-x-2 h-0.5 bg-gradient-to-r from-purple-500 to-indigo-500 rounded-full" />
               )}
               
               {/* Explore Logo Item (Special Case) */}
@@ -93,11 +94,12 @@ export function BottomNav({ className }: BottomNavProps) {
                 >
                   {isActive ? (
                     <div className="relative">
-                      {/* Background glow effect */}
+                      {/* Enhanced background glow effect with new colors */}
                       <motion.div 
-                        className="absolute -inset-1 rounded-full bg-purple-500/15 blur-sm"
+                        className="absolute -inset-1 rounded-full bg-purple-500/20 blur-md"
                         animate={{ 
                           scale: [1, 1.05, 1],
+                          opacity: [0.2, 0.25, 0.2],
                         }}
                         transition={{
                           repeat: Infinity,
@@ -128,9 +130,9 @@ export function BottomNav({ className }: BottomNavProps) {
                     damping: 25,
                   }}
                 >
-                  {/* Enhanced colorful background - now always visible with stronger opacity */}
+                  {/* Enhanced colorful background with new purple gradient */}
                   <motion.div 
-                    className={`absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-blue-500 ${isActive ? 'opacity-25' : 'opacity-15'} blur-md`}
+                    className={`absolute inset-0 rounded-full bg-gradient-to-r from-purple-500 to-indigo-500 ${isActive ? 'opacity-25' : 'opacity-15'} blur-md`}
                     animate={isActive ? { 
                       scale: [1, 1.05, 1],
                       opacity: [0.25, 0.3, 0.25]
@@ -144,10 +146,10 @@ export function BottomNav({ className }: BottomNavProps) {
                 </motion.div>
               )}
               
-              {/* Enhanced glowing effect for active item */}
+              {/* Enhanced glowing effect for active item with new gradient colors */}
               {isActive && !item.isLogo && (
                 <motion.div 
-                  className="absolute -inset-1 bg-gradient-to-r from-purple-500/25 to-blue-500/25 rounded-full blur-sm"
+                  className="absolute -inset-1 bg-gradient-to-r from-purple-500/25 to-indigo-500/25 rounded-full blur-md"
                   animate={{ 
                     opacity: [0.2, 0.3, 0.2],
                     scale: [1, 1.05, 1],

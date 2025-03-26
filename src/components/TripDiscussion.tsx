@@ -46,7 +46,7 @@ const TripDiscussion: React.FC<TripDiscussionProps> = ({
   }
 
   return (
-    <div className="bg-white rounded-lg border overflow-hidden">
+    <div className="overflow-hidden">
       <Chat tripId={tripId} tripName={tripName} />
     </div>
   );

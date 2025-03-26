@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import { Search, MapPin, Filter, Loader2, RefreshCw, Users, Compass, BookOpen, Server, AlertCircle, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Label } from '../components/ui/label';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/lib/supabase';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -17,27 +18,10 @@ import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/components/ui/use-toast';
 import MapboxSearch from '@/components/MapboxSearch';
 import VerificationBadge from '@/components/VerificationBadge';
+import { AnimatedTabs } from "@/components/ui/animated-tabs";
+import { BackgroundGradient } from "@/components/ui/background-gradient";
 
-// Safe import of useInView with fallback
-let useInViewImported;
-try {
-  // Dynamically import useInView to prevent build errors if import fails
-  const reactIntersectionObserver = require('react-intersection-observer');
-  useInViewImported = reactIntersectionObserver.useInView;
-  
-  // Additional safety check
-  if (typeof useInViewImported !== 'function') {
-    throw new Error('useInView is not a function');
-  }
-} catch (error) {
-  // Provide a fallback implementation if import fails
-  console.warn('Could not import useInView, using fallback', error);
-  useInViewImported = () => {
-    const ref = useRef(null);
-    return { ref, inView: true };  // Always trigger loading by default
-  };
-}
-
+// Common types used across components
 interface Trip {
   id: string;
   title: string;
@@ -84,139 +68,544 @@ interface User {
   is_verified?: boolean;
 }
 
+interface ExploreData {
+  trips: Trip[];
+  experiences: Experience[];
+  users: User[];
+}
+
+// Constants
 const PAGE_SIZE = 12;
 const AUTO_REFRESH_INTERVAL = 2 * 60 * 1000; // 2 minutes
 
+// Available tags/categories for filtering
+const AVAILABLE_TAGS = [
+  'Adventure', 'Culture', 'Food', 'Nature', 'City', 'Beach',
+  'Mountains', 'Photography', 'History', 'Art', 'Music'
+];
+
+// Search bar component
+const SearchBar = ({
+  searchQuery,
+  onChange
+}: {
+  searchQuery: string;
+  onChange: (value: string) => void;
+}) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    onChange(e.target.value);
+  };
+
+  return (
+    <div className="relative mb-6 shadow-sm focus-within:ring-2 focus-within:ring-purple-400 rounded-lg overflow-hidden border border-gray-200 hover:border-purple-300 transition-colors">
+      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+        <Search className="h-5 w-5 text-gray-400" />
+      </div>
+      <Input
+        type="text"
+        placeholder="Search trips, experiences, or travelers..."
+        className="pl-10 border-none focus-visible:ring-0 focus-visible:ring-offset-0"
+        value={searchQuery}
+        onChange={handleChange}
+      />
+    </div>
+  );
+};
+
+// Navigation tabs component
+const NavigationTabs = ({
+  activeTab,
+  onChange
+}: {
+  activeTab: string;
+  onChange: (value: string) => void;
+}) => {
+  return (
+    <Tabs 
+      defaultValue={activeTab} 
+      value={activeTab}
+      onValueChange={onChange}
+      className="mb-4"
+    >
+      <TabsList className="grid grid-cols-4 bg-gray-100/80 p-1">
+        <TabsTrigger 
+          value="all"
+          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+        >
+          All
+        </TabsTrigger>
+        <TabsTrigger 
+          value="trips"
+          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+        >
+          Trips
+        </TabsTrigger>
+        <TabsTrigger 
+          value="experiences" 
+          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+        >
+          Experiences
+        </TabsTrigger>
+        <TabsTrigger 
+          value="people"
+          className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+        >
+          Travelers
+        </TabsTrigger>
+      </TabsList>
+    </Tabs>
+  );
+};
+
+// Filter controls component
+const FilterControls = ({
+  showFilters,
+  toggleFilters,
+  selectedLocation,
+  onLocationRemove,
+  selectedTags,
+  onTagRemove,
+  onRefresh,
+  isRefetching,
+}: {
+  showFilters: boolean;
+  toggleFilters: () => void;
+  selectedLocation: string | null;
+  onLocationRemove: () => void;
+  selectedTags: string[];
+  onTagRemove: (tag: string) => void;
+  onRefresh: () => void;
+  isRefetching: boolean;
+}) => {
+  return (
+    <div className="flex justify-between items-center mb-6">
+      <div className="flex gap-2">
+        <Button
+          variant="outline"
+          size="sm"
+          onClick={toggleFilters}
+          className={showFilters ? "border-purple-500 text-purple-700 bg-purple-50" : ""}
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filters
+        </Button>
+        {selectedLocation && (
+          <Badge variant="outline" className="flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-200">
+            <MapPin className="h-3 w-3" />
+            {selectedLocation}
+            <button onClick={onLocationRemove} className="ml-1">
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        )}
+        {selectedTags.map(tag => (
+          <Badge key={tag} variant="outline" className="flex items-center gap-1 bg-purple-50 text-purple-700 border-purple-200">
+            {tag}
+            <button onClick={() => onTagRemove(tag)} className="ml-1">
+              <X className="h-3 w-3" />
+            </button>
+          </Badge>
+        ))}
+      </div>
+      <Button
+        variant="ghost"
+        size="sm"
+        onClick={onRefresh}
+        className="text-purple-600"
+      >
+        <RefreshCw className={`h-4 w-4 mr-1 ${isRefetching ? 'animate-spin' : ''}`} />
+        Refresh
+      </Button>
+    </div>
+  );
+};
+
+// Filter panel component
+const FilterPanel = ({
+  show,
+  availableLocations,
+  isLoadingLocations,
+  onLocationSelect,
+  selectedTags,
+  onTagToggle,
+}: {
+  show: boolean;
+  availableLocations: string[];
+  isLoadingLocations: boolean;
+  onLocationSelect: (location: string) => void;
+  selectedTags: string[];
+  onTagToggle: (tag: string) => void;
+}) => {
+  if (!show) return null;
+  
+  return (
+    <div className="bg-white rounded-lg shadow-md p-4 mb-6 border border-gray-200 animate-in fade-in duration-300">
+      <h3 className="font-medium mb-2 text-gray-700">Filter by:</h3>
+      
+      {/* Location search */}
+      <div className="mb-4">
+        <Label className="mb-1.5 block text-sm">Location</Label>
+        <div className="relative">
+          <MapboxSearch 
+            onPlaceSelect={(place) => {
+              onLocationSelect(place.place_name);
+            }}
+            placeholder="Search for a location..."
+            inputClassName="w-full border border-gray-300 rounded-md px-3 py-2 pl-8 focus:border-purple-500 focus:ring-purple-500"
+          />
+          <MapPin className="absolute left-2.5 top-2.5 h-4 w-4 text-gray-500" />
+        </div>
+        
+        {availableLocations.length > 0 && (
+          <div className="mt-2">
+            <div className="text-xs text-gray-500 mb-1.5">Popular locations:</div>
+            <div className="flex flex-wrap gap-1">
+              {availableLocations.slice(0, 5).map(location => (
+                <Badge 
+                  key={location}
+                  variant="outline"
+                  className="cursor-pointer hover:bg-purple-50"
+                  onClick={() => onLocationSelect(location)}
+                >
+                  {location}
+                </Badge>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
+      
+      {/* Tags/Categories selection */}
+      <div>
+        <Label className="mb-1.5 block text-sm">Tags & Categories</Label>
+        <div className="flex flex-wrap gap-1.5">
+          {AVAILABLE_TAGS.map(tag => (
+            <Badge
+              key={tag}
+              variant={selectedTags.includes(tag) ? "default" : "outline"}
+              className={`cursor-pointer ${selectedTags.includes(tag) ? 'bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700' : 'hover:bg-purple-50'}`}
+              onClick={() => onTagToggle(tag)}
+            >
+              {tag}
+            </Badge>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// Loading state component
+const LoadingState = () => (
+  <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
+    <div className="relative">
+      <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
+      <Loader2 className="w-12 h-12 animate-spin text-purple-600 relative" />
+    </div>
+    <p className="text-gray-600 mt-4 font-medium">Loading content...</p>
+  </div>
+);
+
+// Error state component
+const ErrorState = ({ error, onRetry }: { error: Error | null, onRetry: () => void }) => (
+  <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
+    <div className="text-center p-8 max-w-md">
+      <div className="text-red-500 mb-4">
+        <div className="inline-block p-3 bg-red-100 rounded-full">
+          <div className="h-10 w-10 flex items-center justify-center">
+            <AlertCircle className="h-6 w-6" />
+          </div>
+        </div>
+        <h3 className="text-lg font-medium text-red-800 mt-2">Error Loading Content</h3>
+        <p className="text-red-600 mt-1">{error?.message || 'Something went wrong'}</p>
+      </div>
+      <Button 
+        variant="outline" 
+        className="border-gray-300 text-gray-700 hover:bg-gray-100 mt-2"
+        onClick={onRetry}
+      >
+        Try Again
+      </Button>
+    </div>
+  </div>
+);
+
+// Empty state component
+const EmptyState = ({ onResetFilters }: { onResetFilters: () => void }) => (
+  <div className="flex flex-col items-center justify-center p-8 mt-8 bg-purple-50 rounded-lg border border-purple-100">
+    <Server className="h-10 w-10 text-purple-500 mb-2" />
+    <h3 className="text-lg font-medium text-gray-800">No results found</h3>
+    <p className="text-gray-600 mb-4">Try changing your filters or search query</p>
+    <Button 
+      variant="outline"
+      onClick={onResetFilters}
+    >
+      Clear Filters
+    </Button>
+  </div>
+);
+
+// Load more component
+const LoadMore = ({ 
+  hasNextPage, 
+  isFetchingNextPage, 
+  fetchNextPage,
+  loadMoreRef,
+}: { 
+  hasNextPage: boolean;
+  isFetchingNextPage: boolean;
+  fetchNextPage: () => void;
+  loadMoreRef: React.RefObject<HTMLDivElement>;
+}) => {
+  if (!hasNextPage) return null;
+  
+  return (
+    <div ref={loadMoreRef} className="flex justify-center mt-8 p-4">
+      {isFetchingNextPage ? (
+        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+      ) : (
+        <Button 
+          variant="outline" 
+          onClick={() => fetchNextPage()}
+          className="border-purple-300 text-purple-700 hover:bg-purple-50"
+        >
+          Load More
+        </Button>
+      )}
+    </div>
+  );
+};
+
+// Content renderer
+const ContentRenderer = ({
+  activeTab,
+  data,
+}: {
+  activeTab: string;
+  data: ExploreData;
+}) => {
+  const navigate = useNavigate();
+  
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      {/* Trip Cards */}
+      {(activeTab === 'all' || activeTab === 'trips') && data.trips.map(trip => (
+        <BackgroundGradient key={trip.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
+          <div 
+            className="overflow-hidden cursor-pointer"
+            onClick={() => navigate(`/trips/${trip.id}`)}
+          >
+            <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
+              {trip.image_url ? (
+                <img 
+                  src={trip.image_url} 
+                  alt={trip.title} 
+                  className="h-full w-full object-cover transition-transform hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
+                  <MapPin className="h-12 w-12 text-purple-300" />
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
+                <h3 className="text-lg font-semibold text-white">{trip.title}</h3>
+                <div className="flex items-center gap-1 text-white/90">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span className="text-sm">{trip.location}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Link to={`/profile/${trip.creator_username}`} onClick={(e) => e.stopPropagation()} className="block">
+                    <Avatar className="h-8 w-8 border border-gray-200">
+                      <AvatarImage src={trip.creator_image} alt={trip.creator_name} />
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                        {trip.creator_name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                  <div>
+                    <Link 
+                      to={`/profile/${trip.creator_username}`} 
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-sm font-medium hover:underline"
+                    >
+                      {trip.creator_name}
+                      {trip.creator_is_verified && <VerificationBadge size="sm" />}
+                    </Link>
+                    <span className="text-xs text-gray-500">
+                      {trip.spots} spots available
+                    </span>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/trips/${trip.id}`);
+                  }}
+                >
+                  View details
+                </Button>
+              </div>
+            </div>
+          </div>
+        </BackgroundGradient>
+      ))}
+      
+      {/* Experience Cards */}
+      {(activeTab === 'all' || activeTab === 'experiences') && data.experiences.map(exp => (
+        <BackgroundGradient key={exp.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
+          <div 
+            className="overflow-hidden cursor-pointer"
+            onClick={() => navigate(`/experiences/${exp.id}`)}
+          >
+            <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
+              {exp.image_url ? (
+                <img 
+                  src={exp.image_url} 
+                  alt={exp.title} 
+                  className="h-full w-full object-cover transition-transform hover:scale-105"
+                />
+              ) : (
+                <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
+                  <BookOpen className="h-12 w-12 text-purple-300" />
+                </div>
+              )}
+              <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
+                <h3 className="text-lg font-semibold text-white">{exp.title}</h3>
+                <div className="flex items-center gap-1 text-white/90">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span className="text-sm">{exp.location}</span>
+                </div>
+              </div>
+            </div>
+            <div className="p-4">
+              <p className="mb-3 line-clamp-2 text-sm text-gray-600">{exp.description}</p>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Link to={`/profile/${exp.user.username}`} onClick={(e) => e.stopPropagation()} className="block">
+                    <Avatar className="h-8 w-8 border border-gray-200">
+                      <AvatarImage src={exp.user.profile_image} alt={exp.user.name} />
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                        {exp.user.name.charAt(0)}
+                      </AvatarFallback>
+                    </Avatar>
+                  </Link>
+                  <div>
+                    <Link 
+                      to={`/profile/${exp.user.username}`} 
+                      onClick={(e) => e.stopPropagation()}
+                      className="flex items-center gap-1 text-sm font-medium hover:underline"
+                    >
+                      {exp.user.name}
+                      {exp.user.is_verified && <VerificationBadge size="sm" />}
+                    </Link>
+                    <span className="text-xs text-gray-500">
+                      {format(new Date(exp.created_at), 'MMM d, yyyy')}
+                    </span>
+                  </div>
+                </div>
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/experiences/${exp.id}`);
+                  }}
+                >
+                  View details
+                </Button>
+              </div>
+            </div>
+          </div>
+        </BackgroundGradient>
+      ))}
+      
+      {/* User Cards */}
+      {(activeTab === 'all' || activeTab === 'people') && data.users.map(user => (
+        <BackgroundGradient key={user.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
+          <div 
+            className="overflow-hidden cursor-pointer relative"
+            onClick={() => navigate(`/profile/${user.username}`)}
+          >
+            <div className="h-24 bg-gradient-to-r from-purple-500 to-indigo-600 rounded-t-[18px]"></div>
+            <div className="px-4 pb-4">
+              <div className="relative -mt-12 mb-3 flex items-center">
+                <div className="rounded-full p-1 bg-white">
+                  <Avatar className="h-20 w-20">
+                    <AvatarImage 
+                      src={user.profile_image} 
+                      alt={user.name}
+                      className="object-cover rounded-full"
+                    />
+                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white text-xl">
+                      {user.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                </div>
+                <div className="flex-1 ml-3">
+                  <div className="flex items-center gap-1">
+                    <h3 className="text-lg font-semibold">{user.name}</h3>
+                    {user.is_verified && <VerificationBadge size="sm" />}
+                  </div>
+                  <p className="text-sm text-purple-600">@{user.username}</p>
+                </div>
+              </div>
+              {user.bio && (
+                <p className="mb-3 line-clamp-2 text-sm text-gray-600">{user.bio}</p>
+              )}
+              {user.location && (
+                <div className="flex items-center gap-1 text-gray-500 text-sm mb-3">
+                  <MapPin className="h-3.5 w-3.5" />
+                  <span>{user.location}</span>
+                </div>
+              )}
+              <div className="flex justify-between">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="text-xs w-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigate(`/profile/${user.username}`);
+                  }}
+                >
+                  View profile
+                </Button>
+              </div>
+            </div>
+          </div>
+        </BackgroundGradient>
+      ))}
+    </div>
+  );
+};
+
+// Main Explore component
 const Explore = () => {
+  // Base state
   const [activeTab, setActiveTab] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState<string>('');
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<string | null>(null);
   const [showFilters, setShowFilters] = useState<boolean>(false);
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+  const [isLoadingLocations, setIsLoadingLocations] = useState<boolean>(false);
+  
+  // Refs
+  const loadMoreRef = useRef<HTMLDivElement>(null);
+  
+  // Hooks
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // Create manual fallback in case the hook fails inside the component
-  const fallbackRef = useRef(null);
-  const [manualInView, setManualInView] = useState(true);
-  
-  // Try to use the intersection observer with fallback
-  let observerHook;
-  try {
-    observerHook = useInViewImported();
-  } catch (error) {
-    console.warn('Failed to use useInView in component, using manual fallback');
-    observerHook = { ref: fallbackRef, inView: manualInView };
-  }
-  
-  // Destructure safely with defaults and ensure proper null checking
-  const { ref = fallbackRef, inView = true } = observerHook || {};
-
-  // Available tags/categories for filtering
-  const availableTags = [
-    'Adventure', 'Culture', 'Food', 'Nature', 'City', 'Beach',
-    'Mountains', 'Photography', 'History', 'Art', 'Music'
-  ];
-
-  // At the top of the component, add these state variables
-  const [locationSearchQuery, setLocationSearchQuery] = useState('');
-  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
-  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
-
-  // Add this useEffect to fetch popular locations on component mount
-  useEffect(() => {
-    // Fetch unique locations from trips and experiences
-    const fetchLocations = async () => {
-      setIsLoadingLocations(true);
-      try {
-        // Get unique locations from trips
-        const { data: tripLocations, error: tripError } = await supabase
-          .from('trips')
-          .select('location')
-          .not('location', 'is', null);
-        
-        // Get unique locations from experiences
-        const { data: expLocations, error: expError } = await supabase
-          .from('experiences')
-          .select('location')
-          .not('location', 'is', null);
-        
-        if (tripError) console.error('Error fetching trip locations:', tripError);
-        if (expError) console.error('Error fetching experience locations:', expError);
-        
-        // Combine and deduplicate locations
-        const tripLocs = tripLocations?.map(t => t.location) || [];
-        const expLocs = expLocations?.map(e => e.location) || [];
-        const allLocations = [...new Set([...tripLocs, ...expLocs])];
-        
-        // Sort by most frequent first
-        const locationCounts = allLocations.reduce((acc, loc) => {
-          acc[loc] = (acc[loc] || 0) + 1;
-          return acc;
-        }, {} as Record<string, number>);
-        
-        const sortedLocations = allLocations
-          .sort((a, b) => locationCounts[b] - locationCounts[a])
-          .slice(0, 20); // Limit to 20 most popular locations
-        
-        setAvailableLocations(sortedLocations);
-      } catch (error) {
-        console.error('Error fetching locations:', error);
-      } finally {
-        setIsLoadingLocations(false);
-      }
-    };
-    
-    fetchLocations();
-  }, []);
-  
-  // Add this function to search for locations
-  const searchLocations = async (query: string) => {
-    if (!query.trim()) return;
-    
-    setIsLoadingLocations(true);
-    try {
-      // Search for locations that match the query
-      const { data: tripLocations, error: tripError } = await supabase
-        .from('trips')
-        .select('location')
-        .ilike('location', `%${query}%`)
-        .not('location', 'is', null);
-      
-      const { data: expLocations, error: expError } = await supabase
-        .from('experiences')
-        .select('location')
-        .ilike('location', `%${query}%`)
-        .not('location', 'is', null);
-      
-      if (tripError) console.error('Error searching trip locations:', tripError);
-      if (expError) console.error('Error searching experience locations:', expError);
-      
-      // Combine and deduplicate locations
-      const tripLocs = tripLocations?.map(t => t.location) || [];
-      const expLocs = expLocations?.map(e => e.location) || [];
-      const searchResults = [...new Set([...tripLocs, ...expLocs])];
-      
-      setAvailableLocations(searchResults.slice(0, 20));
-    } catch (error) {
-      console.error('Error searching locations:', error);
-    } finally {
-      setIsLoadingLocations(false);
-    }
-  };
-  
-  // Debounce the search input
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (locationSearchQuery.trim()) {
-        searchLocations(locationSearchQuery);
-      }
-    }, 300);
-    
-    return () => clearTimeout(timer);
-  }, [locationSearchQuery]);
-
   // Fetch data based on active tab
   const fetchData = async ({ pageParam = 0 }) => {
     try {
@@ -325,6 +714,7 @@ const Explore = () => {
     }
   };
 
+  // Query hook
   const {
     data,
     error,
@@ -343,15 +733,6 @@ const Explore = () => {
     staleTime: 5 * 60 * 1000,
   });
 
-  // Auto-refresh data
-  useEffect(() => {
-    const intervalId = setInterval(() => {
-      refetch();
-    }, AUTO_REFRESH_INTERVAL);
-
-    return () => clearInterval(intervalId);
-  }, [refetch]);
-
   // Debounce search input changes
   const debouncedSetSearch = useCallback(
     debounce((value: string) => {
@@ -361,25 +742,12 @@ const Explore = () => {
   );
 
   // Handle search input change
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
+  const handleSearchChange = (value: string) => {
     setSearchQuery(value);
     debouncedSetSearch(value);
   };
 
-  // Load more data when bottom of list is in view
-  useEffect(() => {
-    // Add extra safety check for inView
-    if ((inView === true) && hasNextPage && !isFetchingNextPage) {
-      try {
-        fetchNextPage();
-      } catch (error) {
-        console.error('Error fetching next page:', error);
-      }
-    }
-  }, [inView, hasNextPage, isFetchingNextPage, fetchNextPage]);
-
-  // Get all items from all pages
+  // Process data from all pages
   const allItems = useMemo(() => {
     const items = {
       trips: [] as Trip[],
@@ -387,7 +755,6 @@ const Explore = () => {
       users: [] as User[]
     };
     
-    // Add safety check for empty data
     if (!data?.pages) {
       return items;
     }
@@ -405,356 +772,184 @@ const Explore = () => {
     return items;
   }, [data]);
 
-  // Calculate the height of the fixed header based on filters and tabs visibility
-  const headerHeight = useMemo(() => {
-    let height = 64; // Base height for search bar
-    if (showFilters) {
-      height += 200; // Height for filters panel
+  // Check if we have results
+  const hasResults = useMemo(() => {
+    return (activeTab === 'all' && (allItems.trips.length > 0 || allItems.experiences.length > 0 || allItems.users.length > 0)) ||
+           (activeTab === 'trips' && allItems.trips.length > 0) ||
+           (activeTab === 'experiences' && allItems.experiences.length > 0) ||
+           (activeTab === 'people' && allItems.users.length > 0);
+  }, [activeTab, allItems]);
+
+  // Reset filters
+  const handleResetFilters = () => {
+    setSearchQuery('');
+    setDebouncedSearchQuery('');
+    setSelectedTags([]);
+    setSelectedLocation(null);
+  };
+  
+  // Handle removing a tag
+  const handleRemoveTag = (tag: string) => {
+    setSelectedTags(selectedTags.filter(t => t !== tag));
+  };
+  
+  // Handle toggling a tag
+  const handleTagToggle = (tag: string) => {
+    if (selectedTags.includes(tag)) {
+      handleRemoveTag(tag);
+    } else {
+      setSelectedTags([...selectedTags, tag]);
     }
-    height += 48; // Height for tabs
-    return height;
-  }, [showFilters]);
+  };
 
-  // Show consistent loader during initial loading
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
-          <div className="relative">
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" />
-          </div>
-          <p className="text-gray-600 mt-4 font-medium">Loading content...</p>
-        </div>
-      </div>
+  // Set up intersection observer for infinite scroll
+  useEffect(() => {
+    const loadMoreElement = loadMoreRef.current;
+    if (!loadMoreElement) return;
+    
+    const observer = new IntersectionObserver(
+      entries => {
+        const [entry] = entries;
+        if (entry.isIntersecting && hasNextPage && !isFetchingNextPage) {
+          fetchNextPage().catch(error => {
+            console.error('Error fetching next page:', error);
+          });
+        }
+      },
+      { threshold: 0.1 }
     );
-  }
+    
+    observer.observe(loadMoreElement);
+    
+    return () => {
+      if (loadMoreElement) {
+        observer.unobserve(loadMoreElement);
+      }
+    };
+  }, [hasNextPage, isFetchingNextPage, fetchNextPage]);
 
-  // Show error state with retry button
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
-          <div className="text-center p-8 max-w-md">
-            <div className="text-red-500 mb-4">
-              <div className="inline-block p-3 bg-red-100 rounded-full">
-                <div className="h-10 w-10 flex items-center justify-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" x2="12" y1="8" y2="12"/><line x1="12" x2="12.01" y1="16" y2="16"/></svg>
-                </div>
-              </div>
-              <h3 className="text-lg font-medium text-red-800 mt-2">Error Loading Content</h3>
-              <p className="text-red-600 mt-1">{(error as Error)?.message || 'Something went wrong'}</p>
-            </div>
-            <Button 
-              variant="outline" 
-              className="border-gray-300 text-gray-700 hover:bg-gray-100 mt-2"
-              onClick={() => refetch()}
-            >
-              Try Again
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
+  // Fetch locations
+  useEffect(() => {
+    const fetchLocations = async () => {
+      setIsLoadingLocations(true);
+      try {
+        const { data: tripLocations } = await supabase
+          .from('trips')
+          .select('location')
+          .not('location', 'is', null);
+        
+        const { data: expLocations } = await supabase
+          .from('experiences')
+          .select('location')
+          .not('location', 'is', null);
+        
+        const tripLocs = tripLocations?.map(t => t.location) || [];
+        const expLocs = expLocations?.map(e => e.location) || [];
+        const allLocations = [...new Set([...tripLocs, ...expLocs])];
+        
+        const locationCounts = allLocations.reduce((acc, loc) => {
+          acc[loc] = (acc[loc] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        const sortedLocations = allLocations
+          .sort((a, b) => locationCounts[b] - locationCounts[a])
+          .slice(0, 20);
+        
+        setAvailableLocations(sortedLocations);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+    
+    fetchLocations();
+  }, []);
+  
+  // Auto-refresh data
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      refetch();
+    }, AUTO_REFRESH_INTERVAL);
+
+    return () => clearInterval(intervalId);
+  }, [refetch]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-blue-50 to-white pb-20">
-      {/* Fixed Filters - positioned below the global AppHeader */}
-      <div className="fixed top-16 left-0 right-0 z-40 bg-white/90 backdrop-blur-lg border-b border-gray-200 shadow-sm">
-        <div className="p-4 space-y-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 w-full">
-              <div className="relative flex-1 max-w-md">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                <Input
-                  type="text"
-                  placeholder="Search trips, experiences, and people..."
-                  className="pl-10 pr-4 h-10 w-full bg-white border-gray-300 text-gray-900 placeholder:text-gray-400 focus:ring-blue-500 focus:border-blue-500"
-                  value={searchQuery}
-                  onChange={handleSearchChange}
-                />
-              </div>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="flex-shrink-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                onClick={() => setShowFilters(!showFilters)}
-              >
-                <Filter className="h-5 w-5" />
-              </Button>
-              <Button 
-                variant="ghost" 
-                size="icon"
-                className="flex-shrink-0 text-gray-600 hover:text-gray-900 hover:bg-gray-100"
-                onClick={() => refetch()}
-                disabled={isRefetching}
-              >
-                <RefreshCw className={`h-5 w-5 ${isRefetching ? 'animate-spin' : ''}`} />
-              </Button>
-            </div>
-          </div>
-
-          {/* Filters Panel */}
-          {showFilters && (
-            <div className="space-y-6 mt-3 bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
-              {/* Location Filter */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-2 block">
-                  Location
-                </label>
-                <div className="mb-2">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
-                    <Input
-                      type="text"
-                      placeholder="Search locations..."
-                      className="pl-10 text-sm"
-                      value={locationSearchQuery}
-                      onChange={(e) => setLocationSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </div>
-                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pb-2 px-1">
-                  {isLoadingLocations ? (
-                    <div className="w-full flex justify-center py-2">
-                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
-                    </div>
-                  ) : availableLocations.length > 0 ? (
-                    availableLocations.map((location) => (
-                      <Badge
-                        key={location}
-                        variant={selectedLocation === location ? 'default' : 'outline'}
-                        className={`cursor-pointer py-1.5 px-3 ${
-                          selectedLocation === location 
-                            ? 'bg-blue-600 hover:bg-blue-700' 
-                            : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
-                        }`}
-                        onClick={() => setSelectedLocation(
-                          selectedLocation === location ? null : location
-                        )}
-                      >
-                        {location}
-                      </Badge>
-                    ))
-                  ) : (
-                    <div className="text-sm text-gray-500 py-2 w-full text-center">
-                      {locationSearchQuery ? "No locations found" : "Popular locations will appear here"}
-                    </div>
-                  )}
-                </div>
-              </div>
-
-              {/* Tags/Categories Filter */}
-              <div>
-                <label className="text-sm font-medium text-gray-700 mb-3 block">
-                  Tags & Categories
-                </label>
-                <div className="flex flex-wrap gap-3 max-h-32 overflow-y-auto pb-2 px-1">
-                  {availableTags.map((tag) => (
-                    <Badge
-                      key={tag}
-                      variant={selectedTags.includes(tag) ? 'default' : 'outline'}
-                      className={`cursor-pointer py-1.5 px-3 ${selectedTags.includes(tag) ? 'bg-purple-600 hover:bg-purple-700' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
-                      onClick={() => setSelectedTags(
-                        selectedTags.includes(tag)
-                          ? selectedTags.filter(t => t !== tag)
-                          : [...selectedTags, tag]
-                      )}
-                    >
-                      {tag}
-                    </Badge>
-                  ))}
-                </div>
-              </div>
-
-              {/* Reset button for all filters */}
-              {(selectedTags.length > 0 || selectedLocation || searchQuery) && (
-                <div className="flex justify-end">
-                  <Button 
-                    variant="outline" 
-                    size="sm"
-                    className="text-gray-600 hover:bg-gray-100"
-                    onClick={() => {
-                      setSearchQuery('');
-                      setDebouncedSearchQuery('');
-                      setSelectedLocation(null);
-                      setSelectedTags([]);
-                    }}
-                  >
-                    Reset All Filters
-                  </Button>
-                </div>
-              )}
-            </div>
-          )}
-
-          {/* Tabs */}
-          <Tabs defaultValue="all" className="w-full" value={activeTab} onValueChange={setActiveTab}>
-            <TabsList className="grid w-full grid-cols-4 bg-gray-100 text-gray-600">
-              <TabsTrigger 
-                value="all"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                All
-              </TabsTrigger>
-              <TabsTrigger 
-                value="trips"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                Trips
-              </TabsTrigger>
-              <TabsTrigger 
-                value="experiences"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                Experiences
-              </TabsTrigger>
-              <TabsTrigger 
-                value="people"
-                className="data-[state=active]:bg-blue-600 data-[state=active]:text-white"
-              >
-                People
-              </TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </div>
-      </div>
-      
-      {/* Main content with proper spacing */}
-      <div style={{ paddingTop: `${headerHeight + 64}px` }} className="container mx-auto px-4">
-        {/* Grid container for content */}
-        <div className="py-4">
-          {/* Show content counters */}
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex gap-3 text-sm text-gray-600">
-              {activeTab === 'all' && (
-                <>
-                  <span className="flex items-center">
-                    <Compass className="h-4 w-4 mr-1" />
-                    {allItems.trips.length}
-                  </span>
-                  <span className="flex items-center">
-                    <BookOpen className="h-4 w-4 mr-1" />
-                    {allItems.experiences.length}
-                  </span>
-                  <span className="flex items-center">
-                    <Users className="h-4 w-4 mr-1" />
-                    {allItems.users.length}
-                  </span>
-                </>
-              )}
-              {activeTab === 'trips' && (
-                <span className="flex items-center">
-                  <Compass className="h-4 w-4 mr-1" />
-                  {allItems.trips.length}
-                </span>
-              )}
-              {activeTab === 'experiences' && (
-                <span className="flex items-center">
-                  <BookOpen className="h-4 w-4 mr-1" />
-                  {allItems.experiences.length}
-                </span>
-              )}
-              {activeTab === 'people' && (
-                <span className="flex items-center">
-                  <Users className="h-4 w-4 mr-1" />
-                  {allItems.users.length}
-                </span>
-              )}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {/* Render Trips */}
-            {(activeTab === 'all' || activeTab === 'trips') && allItems.trips.map(trip => (
-              <TravelDestinationCard
-                key={`trip-${trip.id}`}
-                imageSrc={trip.image_url || 'https://via.placeholder.com/400x250'}
-                location={trip.location || 'Unknown location'}
-                description={trip.title || 'Untitled trip'}
-                rating={4.5}
-                creatorName={trip.creator_name || 'Anonymous'}
-                creatorImage={trip.creator_image || ''} 
-                creatorId={trip.creator_id || ''}
-                creatorUsername={trip.creator_username || 'user'}
-                creatorIsVerified={trip.creator_is_verified}
-                itemType="trip"
-                onClick={() => navigate(`/trips/${trip.id}`)}
-              />
-            ))}
+    <div className="container max-w-screen-xl mx-auto px-4 pb-24 md:pb-12">
+      <div className="min-h-screen">
+        {/* Hero section */}
+        <div className="relative -mx-4 px-4 py-8 md:py-12 mb-8 bg-gradient-to-r from-purple-500/5 to-indigo-500/5 rounded-b-3xl">
+          <div className="max-w-2xl mx-auto">
+            <h1 className="text-3xl md:text-4xl font-semibold mb-4 text-center bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              Explore the world with travelers like you
+            </h1>
+            <p className="text-center text-gray-600 mb-6">
+              Discover trips, experiences, and travelers to connect with
+            </p>
             
-            {/* Render Experiences */}
-            {(activeTab === 'all' || activeTab === 'experiences') && allItems.experiences.map(experience => (
-              <TravelDestinationCard
-                key={`experience-${experience.id}`}
-                imageSrc={experience.image_url || 'https://via.placeholder.com/400x250'}
-                location={experience.location || 'Unknown location'}
-                description={experience.title || 'Untitled experience'}
-                creatorName={experience.user?.name || 'Anonymous'}
-                creatorImage={experience.user?.profile_image || ''}
-                creatorId={experience.user_id || ''}
-                creatorUsername={experience.user?.username || 'user'}
-                creatorIsVerified={experience.user?.is_verified}
-                itemType="experience" 
-                onClick={() => navigate(`/experiences/${experience.id}`)}
-              />
-            ))}
+            {/* Search bar */}
+            <SearchBar 
+              searchQuery={searchQuery} 
+              onChange={handleSearchChange}
+            />
             
-            {/* Render Users */}
-            {(activeTab === 'all' || activeTab === 'people') && allItems.users.map(user => (
-              <Link
-                key={`user-${user.id}`}
-                to={`/profile/${user.username}`}
-                className="bg-white rounded-lg overflow-hidden border border-gray-200 shadow-sm hover:shadow-md p-5 hover:scale-[1.02] transition-all duration-300"
-              >
-                <div className="flex flex-col items-center text-center mb-3">
-                  <Avatar className="h-16 w-16 mb-3 border-2 border-gray-200 ring-2 ring-blue-100">
-                    <AvatarImage src={user.profile_image} />
-                    <AvatarFallback className="bg-gradient-to-br from-blue-600 to-indigo-700 text-white">
-                      {user.name && user.name.length > 0 ? user.name[0] : '?'}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div>
-                    <div className="flex items-center justify-center">
-                      <h3 className="font-semibold text-gray-800 text-lg">{user.name}</h3>
-                      {user.is_verified && (
-                        <span className="ml-1">
-                          <VerificationBadge size="sm" />
-                        </span>
-                      )}
-                    </div>
-                    <p className="text-sm text-blue-600">@{user.username}</p>
-                    {user.location && (
-                      <div className="flex items-center justify-center text-gray-500 text-sm mt-1">
-                        <MapPin className="h-3 w-3 mr-1" />
-                        <span>{user.location}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-                
-                {user.bio && (
-                  <div className="pt-3 border-t border-gray-100">
-                    <p className="text-sm text-gray-700 line-clamp-2 text-center">{user.bio}</p>
-                  </div>
-                )}
-                
-                <div className="mt-3 pt-3 border-t border-gray-100">
-                  <Button 
-                    variant="outline" 
-                    className="w-full border-blue-200 text-blue-600 hover:bg-blue-50"
-                  >
-                    View Profile
-                  </Button>
-                </div>
-              </Link>
-            ))}
+            {/* Navigation tabs */}
+            <NavigationTabs 
+              activeTab={activeTab} 
+              onChange={setActiveTab}
+            />
+            
+            {/* Filter controls */}
+            <FilterControls 
+              showFilters={showFilters}
+              toggleFilters={() => setShowFilters(!showFilters)}
+              selectedLocation={selectedLocation}
+              onLocationRemove={() => setSelectedLocation(null)}
+              selectedTags={selectedTags}
+              onTagRemove={handleRemoveTag}
+              onRefresh={() => refetch()}
+              isRefetching={isRefetching}
+            />
+            
+            {/* Filter panel */}
+            <FilterPanel 
+              show={showFilters}
+              availableLocations={availableLocations}
+              isLoadingLocations={isLoadingLocations}
+              onLocationSelect={(location) => setSelectedLocation(location)}
+              selectedTags={selectedTags}
+              onTagToggle={handleTagToggle}
+            />
           </div>
         </div>
+        
+        {/* Content area */}
+        {isLoading ? (
+          <LoadingState />
+        ) : error ? (
+          <ErrorState error={error as Error} onRetry={() => refetch()} />
+        ) : !hasResults ? (
+          <EmptyState onResetFilters={handleResetFilters} />
+        ) : (
+          <>
+            <ContentRenderer 
+              activeTab={activeTab}
+              data={allItems}
+            />
+            
+            <LoadMore 
+              hasNextPage={!!hasNextPage}
+              isFetchingNextPage={isFetchingNextPage}
+              fetchNextPage={() => fetchNextPage()}
+              loadMoreRef={loadMoreRef}
+            />
+          </>
+        )}
       </div>
     </div>
   );
 };
 
-export default Explore;
+export default Explore; 

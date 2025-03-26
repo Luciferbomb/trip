@@ -25,6 +25,7 @@ import 'mapbox-gl/dist/mapbox-gl.css';
 import { format } from 'date-fns';
 import VerificationBadge from '@/components/VerificationBadge';
 import InlineVerifiedBadge from '@/components/InlineVerifiedBadge';
+import { BackgroundGradient } from "@/components/ui/background-gradient";
 
 interface UserProfile {
   id: string;
@@ -90,6 +91,11 @@ interface Experience {
   image_url: string | null;
   user_id: string;
   created_at: string;
+  user: {
+    name: string;
+    profile_image: string;
+    username: string;
+  };
 }
 
 interface Comment {
@@ -131,8 +137,18 @@ const LoadingScreen = () => (
   <div className="min-h-screen bg-gray-50 pb-20">
     <BottomNav />
     <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
-      <Loader2 className="h-12 w-12 text-hireyth-main animate-spin mb-4" />
-      <p className="text-gray-600 text-lg">Loading profile...</p>
+      <div className="relative">
+        <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full blur-sm opacity-70"></div>
+        <Avatar className="h-32 w-32 border-4 border-white relative">
+          <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-500">
+            <User className="h-12 w-12 text-white" />
+          </AvatarFallback>
+        </Avatar>
+      </div>
+      <div className="mt-6 text-center">
+        <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mx-auto mb-2"></div>
+        <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mx-auto"></div>
+      </div>
     </div>
   </div>
 );
@@ -167,9 +183,11 @@ const Profile = () => {
   const isOwnProfile = user !== null && profileData !== null && user.id === profileData.id;
 
   useEffect(() => {
-    if (user) {
-      fetchProfileData();
+    if (!user) {
+      navigate('/login');
+      return;
     }
+    fetchProfileData();
   }, [username, user]);
 
   useEffect(() => {
@@ -246,14 +264,14 @@ const Profile = () => {
       
       // Use a single query to fetch user data with all related counts
       const { data: userData, error: userError } = await supabase
-        .from('users')
+          .from('users')
         .select(`
           id, name, username, email, phone, gender, location, profile_image, 
           bio, instagram, linkedin, experiences_count, followers_count, 
           following_count, is_verified, verification_reason
         `)
         .eq(queryParam, queryValue)
-        .single();
+          .single();
           
       if (userError) {
         if (userError.code === 'PGRST116') {
@@ -821,66 +839,77 @@ const Profile = () => {
     const isOwner = user?.id === trip.creator_id;
     
     return (
-      <div key={trip.id} className="relative group">
-        <Link to={`/trips/${trip.id}`} className="block">
-          <div className="modern-card bg-white overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-100">
-            <div className="relative aspect-[16/9] overflow-hidden gradient-overlay">
-      <img
-        src={trip.image_url}
-        alt={trip.title}
-                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+      <BackgroundGradient key={trip.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
+        <div 
+          className="overflow-hidden cursor-pointer relative"
+          onClick={() => navigate(`/trips/${trip.id}`)}
+        >
+          <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
+            {trip.image_url ? (
+              <img 
+                src={trip.image_url} 
+                alt={trip.title} 
+                className="h-full w-full object-cover transition-transform hover:scale-105"
               />
-              
-              {/* Creator Info - Overlaid on image */}
-              <div className="absolute bottom-4 left-4 flex items-center z-10">
-                <img
-                  src={trip.creator_image}
-                  alt={trip.creator_name}
-                  className="w-8 h-8 rounded-full border-2 border-white object-cover shadow-md"
-                />
-                <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
+                <MapPin className="h-12 w-12 text-purple-300" />
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
+              <h3 className="text-lg font-semibold text-white">{trip.title}</h3>
+              <div className="flex items-center gap-1 text-white/90">
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="text-sm">{trip.location}</span>
               </div>
             </div>
-            
-      <div className="p-4">
-              <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{trip.title}</h3>
-              <div className="flex items-center text-gray-600 mb-2">
-                <MapPin className="w-4 h-4 mr-1 text-blue-500" />
-                <span>{trip.location}</span>
           </div>
-              
-              <div className="flex items-center text-gray-600">
-                <Calendar className="w-4 h-4 mr-1 text-blue-500" />
-                <span className="text-sm">
-                  {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
-                </span>
+          
+          <div className="p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8 border border-gray-200">
+                  <AvatarImage 
+                    src={trip.creator_image} 
+                    alt={trip.creator_name}
+                    className="object-cover"
+                  />
+                  <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                    {trip.creator_name.charAt(0)}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">{trip.creator_name}</p>
+                  <div className="flex items-center gap-1 text-xs text-gray-500">
+                    <Calendar className="h-3.5 w-3.5" />
+                    {format(new Date(trip.start_date), 'MMM d, yyyy')}
+                  </div>
+                </div>
               </div>
               
-          {trip.status && (
-                <div className="mt-2">
-                  <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'} className="pill-badge">
-              {trip.status}
-            </Badge>
-                </div>
+              {trip.status && (
+                <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'} className="text-xs">
+                  {trip.status}
+                </Badge>
+              )}
+            </div>
+          </div>
+          
+          {isOwner && (
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <Button
+                variant="destructive"
+                size="sm"
+                className="bg-red-500/90 hover:bg-red-600 rounded-full h-8 w-8 p-0"
+                onClick={(e) => handleDeleteTrip(trip.id, e)}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
           )}
         </div>
-      </div>
-        </Link>
-        
-        {isOwner && (
-          <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
-            <Button
-              variant="destructive"
-              size="sm"
-              className="bg-red-500/90 hover:bg-red-600 rounded-full h-8 w-8 p-0"
-              onClick={(e) => handleDeleteTrip(trip.id, e)}
-            >
-              <Trash2 className="w-4 h-4" />
-            </Button>
-          </div>
-        )}
-    </div>
-  );
+      </BackgroundGradient>
+    );
   };
 
   // Update the followers dialog content
@@ -1228,24 +1257,117 @@ const Profile = () => {
     );
   };
 
+  const renderExperienceCard = (experience: Experience) => {
+    const isOwner = user?.id === experience.user_id;
+    
+    return (
+      <BackgroundGradient key={experience.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
+        <div 
+          className="overflow-hidden cursor-pointer relative"
+          onClick={() => navigate(`/experiences/${experience.id}`)}
+        >
+          <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
+            {experience.image_url ? (
+              <img 
+                src={experience.image_url} 
+                alt={experience.title} 
+                className="h-full w-full object-cover transition-transform hover:scale-105"
+              />
+            ) : (
+              <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
+                <MapPin className="h-12 w-12 text-purple-300" />
+              </div>
+            )}
+            <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
+              <h3 className="text-lg font-semibold text-white">{experience.title}</h3>
+              <div className="flex items-center gap-1 text-white/90">
+                <MapPin className="h-3.5 w-3.5" />
+                <span className="text-sm">{experience.location}</span>
+              </div>
+            </div>
+          </div>
+          
+          <div className="p-4">
+            <p className="mb-3 line-clamp-2 text-sm text-gray-600">{experience.description}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Avatar className="h-8 w-8 border border-gray-200">
+                  {experience.user?.profile_image ? (
+                    <AvatarImage 
+                      src={experience.user.profile_image} 
+                      alt={experience.user.name}
+                      className="object-cover"
+                    />
+                  ) : (
+                    <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
+                      {experience.user?.name ? experience.user.name[0] : '?'}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+                <div>
+                  <p className="text-sm font-medium">{experience.user?.name || 'Unknown User'}</p>
+                  <span className="text-xs text-gray-500">
+                    {format(new Date(experience.created_at), 'MMM d, yyyy')}
+                  </span>
+                </div>
+              </div>
+              <Button 
+                variant="outline" 
+                size="sm" 
+                className="text-xs"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteExperience(experience.id);
+                }}
+              >
+                View details
+              </Button>
+            </div>
+          </div>
+          
+          {isOwner && (
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity z-10">
+              <Button
+                variant="destructive"
+                size="sm"
+                className="bg-red-500/90 hover:bg-red-600 rounded-full h-8 w-8 p-0"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  handleDeleteExperience(experience.id);
+                }}
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
+      </BackgroundGradient>
+    );
+  };
+
   if (loading) {
     return <LoadingScreen />;
   }
 
-  if (error) {
+  if (!user) {
+    navigate('/login');
+    return null;
+  }
+
+  if (error || !profileData) {
     return (
       <div className="min-h-screen bg-gray-50 pb-20">
         <BottomNav />
         <div className="flex flex-col items-center justify-center pt-20 h-[60vh] px-4">
           <div className="bg-white rounded-lg shadow-md p-6 max-w-md w-full text-center">
-          <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
+            <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
             <h2 className="text-xl font-semibold text-gray-800 mb-2">Could Not Load Profile</h2>
-            <p className="text-gray-600 mb-6">{error}</p>
+            <p className="text-gray-600 mb-6">{error || 'Profile data not found'}</p>
             <div className="flex justify-center gap-4">
               <Button onClick={() => fetchProfileData()} className="flex items-center gap-2">
-              <RefreshCw className="h-4 w-4" />
+                <RefreshCw className="h-4 w-4" />
                 Try Again
-            </Button>
+              </Button>
               <Button variant="outline" onClick={() => navigate('/')} className="flex items-center gap-2">
                 <Home className="h-4 w-4" />
                 Go Home
@@ -1257,453 +1379,375 @@ const Profile = () => {
     );
   }
   
-  if (!profileData) {
-    return (
-      <div className="min-h-screen bg-gray-50 pb-20">
-        <BottomNav />
-        <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
-          <UserX className="h-12 w-12 text-red-500 mb-4" />
-          <p className="text-gray-800 text-xl font-medium mb-2">Profile Not Found</p>
-          <p className="text-gray-600 mb-6">The requested profile could not be found.</p>
-          <Button onClick={() => navigate('/')} className="flex items-center gap-2">
-            <Home className="h-4 w-4" />
-            Return Home
-          </Button>
-          </div>
-      </div>
-    );
-  }
-
   // Main profile content
   return (
-    <div className="min-h-screen bg-gray-50 pb-20">
+    <div className="min-h-screen bg-white pb-24">
       <BottomNav />
-      <div className="max-w-4xl mx-auto px-4">
-        {/* Profile Header */}
-        <div className="mb-8">
-          <div className="relative mb-20 sm:mb-24">
-            {/* Cover Image with Map Background */}
-            <div className="h-48 sm:h-64 rounded-xl overflow-hidden shadow-md relative">
-              {profileData && (
-                <div className="absolute inset-0 w-full h-full">
-                  <ProfileMapBackground userId={profileData.id} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-black/40 to-transparent"></div>
+      
+      {/* Updated profile header with brand gradient colors */}
+      <div className="relative">
+        {/* Gradient header background */}
+        <div className="absolute inset-0 bg-gradient-to-br from-purple-500/90 to-indigo-600/90 h-48"></div>
+        
+        {/* Profile info section */}
+        <div className="container max-w-4xl mx-auto px-4 relative pt-6">
+          <div className="bg-white rounded-xl shadow-md p-6 mt-20">
+            <div className="flex flex-col items-center md:flex-row md:items-start relative">
+              {/* Avatar with brand border */}
+              <div className="absolute -top-20 md:-top-16 md:relative md:mr-6">
+                <div className="rounded-full h-32 w-32 relative">
+                  <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full blur-sm opacity-70"></div>
+                  <Avatar className="h-32 w-32 border-4 border-white relative">
+                    {profileData?.profile_image ? (
+                      <AvatarImage 
+                        src={profileData.profile_image} 
+                        alt={profileData.name}
+                        className="object-cover"
+                      />
+                    ) : (
+                      <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-500 text-white text-xl">
+                        {profileData?.name ? profileData.name[0] : <User className="h-12 w-12 text-white" />}
+                      </AvatarFallback>
+                    )}
+                  </Avatar>
                 </div>
-              )}
-            </div>
-            
-            {/* Profile Image */}
-            <div className="absolute -bottom-16 sm:-bottom-20 left-1/2 -translate-x-1/2 shadow-xl rounded-full border-4 border-white bg-white z-10 transition-transform duration-500 hover:scale-105">
-              <div className="w-32 h-32 sm:w-40 sm:h-40 rounded-full overflow-hidden bg-white">
-              <img
-                src={profileData?.profile_image}
-                alt={profileData?.name}
-                  className="w-full h-full object-cover"
-                  loading="lazy"
-              />
               </div>
-            </div>
-            </div>
           
-          {/* User Info */}
-          <div className="text-center mb-6">
-            {isEditMode ? (
-              <Input
-                value={editForm.name || ''}
-                onChange={(e) => handleInputChange('name', e.target.value)}
-                className="font-bold text-xl mb-1 text-center modern-focus"
-                placeholder="Your name"
-              />
-            ) : (
-              <h1 className="text-2xl font-bold mb-1 gradient-text flex items-center justify-center">
-                {profileData?.name}
-                {profileData?.is_verified && (
-                  <span className="ml-2 bg-purple-600 w-5 h-5 rounded-full flex items-center justify-center">
-                    <span className="text-white text-xs">✓</span>
-                  </span>
-                )}
-              </h1>
-            )}
-            
-            <div className="flex items-center justify-center mb-3">
-              <p className="text-gray-500">@{profileData?.username}</p>
-            </div>
-            
-            <div className="flex justify-center space-x-3 text-sm text-gray-500 mb-4">
-              {isEditMode ? (
-                <Input
-                  value={editForm.location || ''}
-                  onChange={(e) => handleInputChange('location', e.target.value)}
-                  className="mt-2 max-w-xs mx-auto modern-focus"
-                  placeholder="Add your location"
-                />
-              ) : profileData?.location && (
-                <div className="flex items-center">
-                  <MapPin size={14} className="mr-1 text-blue-500" />
-                  <span>{profileData.location}</span>
-                </div>
+              {/* User information */}
+              <div className="text-center md:text-left mt-14 md:mt-0 flex-1">
+                <div className="flex items-center justify-center md:justify-start">
+                  <h1 className="text-2xl font-bold">{profileData?.name}</h1>
+                  {profileData?.is_verified && (
+                    <InlineVerifiedBadge className="ml-2" />
               )}
             </div>
             
-            {/* Bio */}
-            {isEditMode ? (
-              <div className="mt-4 mb-6 max-w-lg mx-auto">
-                <label className="text-sm font-medium text-gray-700 mb-1 block">About</label>
-              <Textarea
-                value={editForm.bio || ''}
-                onChange={(e) => handleInputChange('bio', e.target.value)}
-                  placeholder="Write something about yourself..."
-                  className="resize-none h-24 modern-focus"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  Share a little about yourself, your interests, and your travel style.
-                </p>
+                <div className="flex items-center justify-center md:justify-start mt-1 text-gray-600">
+                  <p>@{profileData?.username}</p>
               </div>
-            ) : profileData?.bio ? (
-              <div className="max-w-lg mx-auto mb-6 mt-3">
-                <div className="glassmorphism-card bg-white hover:shadow-lg transition-all duration-300">
-                  <div className="absolute -top-3 left-4 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full p-1.5 shadow-md">
-                    <User className="h-4 w-4 text-white" />
-                  </div>
-                  <h4 className="text-sm font-medium text-gray-700 mb-2 pl-1">About</h4>
-                  <p className="text-gray-600 text-sm leading-relaxed whitespace-pre-line pl-1">{profileData.bio}</p>
-                </div>
+                
+                {profileData?.location && (
+                  <div className="flex items-center justify-center md:justify-start mt-1 text-gray-500">
+                    <MapPin className="h-4 w-4 mr-1 text-purple-500" />
+                    <p>{profileData.location}</p>
               </div>
-            ) : isOwnProfile ? (
-              <div className="max-w-lg mx-auto mb-6 mt-3">
-                <Button 
-                  variant="modern-outline" 
-                  className="text-gray-500 hover:text-blue-600 flex items-center text-sm"
-                  onClick={() => setIsEditMode(true)}
-                >
-                  <PlusCircle className="h-4 w-4 mr-2" />
-                  Add bio
-                </Button>
-              </div>
-            ) : null}
-            
-            {/* Stats */}
-            <div className="flex justify-center space-x-6 mb-6">
-              <div className="text-center stat-counter">
-                <div className="font-bold text-blue-600">{experiences.length}</div>
-                <div className="text-xs text-gray-500">Experiences</div>
-              </div>
-              <button
-                className="text-center stat-counter"
-                onClick={() => {
-                  setShowFollowers(true);
-                  fetchFollowers();
-                }}
-              >
-                <div className="font-bold text-blue-600">{profileData?.followers_count ?? 0}</div>
-                <div className="text-xs text-gray-500">Followers</div>
-              </button>
-              <button
-                className="text-center stat-counter"
-                onClick={() => {
-                  setShowFollowing(true);
-                  fetchFollowing();
-                }}
-              >
-                <div className="font-bold text-blue-600">{profileData?.following_count ?? 0}</div>
-                <div className="text-xs text-gray-500">Following</div>
-              </button>
-            </div>
-            
-            {/* Social Links */}
-            {isEditMode ? (
-              <div className="space-y-2 max-w-md mx-auto mb-6">
-                <div className="flex items-center">
-                  <span className="text-pink-600 w-6 h-6 mr-2">
-                    <svg fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M12 0C8.74 0 8.333.015 7.053.072 5.775.132 4.905.333 4.14.63c-.789.306-1.459.717-2.126 1.384S.935 3.35.63 4.14C.333 4.905.131 5.775.072 7.053.012 8.333 0 8.74 0 12s.015 3.667.072 4.947c.06 1.277.261 2.148.558 2.913.306.788.717 1.459 1.384 2.126.667.666 1.336 1.079 2.126 1.384.766.296 1.636.499 2.913.558C8.333 23.988 8.74 24 12 24s3.667-.015 4.947-.072c1.277-.06 2.148-.262 2.913-.558.788-.306 1.459-.718 2.126-1.384.666-.667 1.079-1.335 1.384-2.126.296-.765.499-1.636.558-2.913.06-1.28.072-1.687.072-4.947s-.015-3.667-.072-4.947c-.06-1.277-.262-2.149-.558-2.913-.306-.789-.718-1.459-1.384-2.126C21.319 1.347 20.651.935 19.86.63c-.765-.297-1.636-.499-2.913-.558C15.667.012 15.26 0 12 0zm0 2.16c3.203 0 3.585.016 4.85.071 1.17.055 1.805.249 2.227.415.562.217.96.477 1.382.896.419.42.679.819.896 1.381.164.422.36 1.057.413 2.227.057 1.266.07 1.646.07 4.85s-.015 3.585-.074 4.85c-.061 1.17-.256 1.805-.421 2.227-.224.562-.479.96-.899 1.382-.419.419-.824.679-1.38.896-.42.164-1.065.36-2.235.413-1.274.057-1.649.07-4.859.07-3.211 0-3.586-.015-4.859-.074-1.171-.061-1.816-.256-2.236-.421-.569-.224-.96-.479-1.379-.899-.421-.419-.69-.824-.9-1.38-.165-.42-.359-1.065-.42-2.235-.045-1.26-.061-1.649-.061-4.844 0-3.196.016-3.586.061-4.861.061-1.17.255-1.814.42-2.234.21-.57.479-.96.9-1.381.419-.419.81-.689 1.379-.898.42-.166 1.051-.361 2.221-.421 1.275-.045 1.65-.06 4.859-.06l.045.03zm0 3.678c-3.405 0-6.162 2.76-6.162 6.162 0 3.405 2.76 6.162 6.162 6.162 3.405 0 6.162-2.76 6.162-6.162 0-3.405-2.76-6.162-6.162-6.162zM12 16c-2.21 0-4-1.79-4-4s1.79-4 4-4 4 1.79 4 4-1.79 4-4 4zm7.846-10.405c0 .795-.646 1.44-1.44 1.44-.795 0-1.44-.646-1.44-1.44 0-.794.646-1.439 1.44-1.439.793-.001 1.44.645 1.44 1.439z"/>
-                    </svg>
-                  </span>
-                  <Input
-                    value={editForm.instagram || ''}
-                    onChange={(e) => handleInputChange('instagram', e.target.value)}
-                    placeholder="Instagram username (without @)"
-                    className="modern-focus"
-                  />
-                </div>
-                <div className="flex items-center">
-                  <span className="text-blue-600 w-6 h-6 mr-2">
-                    <svg fill="currentColor" viewBox="0 0 24 24">
-                      <path d="M20.447 20.452h-3.554v-5.569c0-1.328-.027-3.037-1.852-3.037-1.853 0-2.136 1.445-2.136 2.939v5.667H9.351V9h3.414v1.561h.046c.477-.9 1.637-1.85 3.37-1.85 3.601 0 4.267 2.37 4.267 5.455v6.286zM5.337 7.433c-1.144 0-2.063-.926-2.063-2.065 0-1.138.92-2.063 2.063-2.063 1.14 0 2.064.925 2.064 2.063 0 1.139-.925 2.065-2.064 2.065zm1.782 13.019H3.555V9h3.564v11.452z"/>
-                    </svg>
-                  </span>
-                  <Input
-                    value={editForm.linkedin || ''}
-                    onChange={(e) => handleInputChange('linkedin', e.target.value)}
-                    placeholder="LinkedIn username"
-                    className="modern-focus"
-                  />
-                </div>
-              </div>
-            ) : (
-              <div className="flex justify-center mb-6">
+                )}
+                
+                <div className="flex justify-center md:justify-start items-center mt-3 space-x-1">
                 {renderSocialLinks()}
               </div>
-            )}
+              </div>
             
-            {/* Actions */}
-            <div className="flex justify-center space-x-3 mb-8">
+              {/* Follow/Edit button */}
+              <div className="mt-4 md:mt-0 w-full md:w-auto flex justify-center md:justify-end">
               {isOwnProfile ? (
                 <Button
-                  variant={isEditMode ? "modern" : "modern-outline"}
-                  size="sm"
-                  onClick={() => {
-                    if (isEditMode) {
-                      handleSaveProfile();
-                    } else {
-                      setIsEditMode(true);
-                    }
-                  }}
-                  disabled={isSaving}
-                  className="flex items-center"
-                >
-                  {isSaving ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
-                  ) : isEditMode ? (
-                    <>
-                      <Save className="w-4 h-4 mr-2" />
-                      Save Profile
-                    </>
-                  ) : (
-                    <>
-                      <Edit className="w-4 h-4 mr-2" />
+                    variant="brand-outline"
+                    className="w-40"
+                    onClick={() => setIsEditMode(true)}
+                  >
+                    <Edit className="mr-2 h-4 w-4" />
                       Edit Profile
-                    </>
-                  )}
                 </Button>
               ) : (
                 <Button
-                  variant={isFollowing ? "modern-outline" : "modern"}
-                  size="sm"
+                    variant={isFollowing ? "brand-outline" : "brand"}
+                    className="w-40"
                   onClick={handleFollow}
                   disabled={followLoading}
-                  className="flex items-center"
                 >
                   {followLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                      <Loader2 className="h-4 w-4 animate-spin mr-2" />
                   ) : isFollowing ? (
-                    <>
-                      <UserMinus className="w-4 h-4 mr-2" />
-                      Unfollow
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-4 h-4 mr-2" />
-                      Follow
-                    </>
-                  )}
-                </Button>
-              )}
-              
-              {isOwnProfile && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={handleLogout}
-                  className="flex items-center text-red-600 hover:text-red-700 hover:bg-red-50 border-red-200"
-                >
-                  <LogOut className="w-4 h-4 mr-2" />
-                  Logout
+                      <UserMinus className="mr-2 h-4 w-4" />
+                    ) : (
+                      <UserPlus className="mr-2 h-4 w-4" />
+                    )}
+                    {isFollowing ? 'Unfollow' : 'Follow'}
                 </Button>
               )}
               </div>
                 </div>
+            
+            {/* Bio */}
+            {profileData?.bio && (
+              <div className="mt-6 px-4 py-2 bg-gray-50 rounded-md">
+                <p className="text-gray-600">
+                  {profileData.bio}
+                </p>
         </div>
-        
-        {/* Tabs */}
-        <div className="mb-6">
-          <div className="modern-tabs bg-white rounded-lg shadow-sm mb-6 border border-gray-100 p-0.5">
-                <button
-              className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === 'experiences' 
-                  ? 'modern-tab-active bg-blue-50 text-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('experiences')}
-            >
-              <Camera className={`w-4 h-4 mr-2 ${activeTab === 'experiences' ? 'text-blue-500' : ''}`} />
-              <span>Experiences</span>
-                </button>
-                <button
-              className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === 'created' 
-                  ? 'modern-tab-active bg-blue-50 text-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('created')}
-            >
-              <MapIcon className={`w-4 h-4 mr-2 ${activeTab === 'created' ? 'text-blue-500' : ''}`} />
-              <span>Created</span>
-                </button>
-            <button
-              className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
-                activeTab === 'joined' 
-                  ? 'modern-tab-active bg-blue-50 text-blue-600' 
-                  : 'text-gray-500 hover:text-gray-700'
-              }`}
-              onClick={() => setActiveTab('joined')}
-            >
-              <Bookmark className={`w-4 h-4 mr-2 ${activeTab === 'joined' ? 'text-blue-500' : ''}`} />
-              <span>Joined</span>
-            </button>
-        </div>
-        
-          {/* Tab Content */}
-          <div>
-            {activeTab === 'experiences' && (
-              <div className="space-y-6 relative">
-                {experiences.length === 0 ? (
-                  <div className="text-center py-8">
-                    <p className="text-gray-600">No experiences shared yet</p>
-              {isOwnProfile && (
-                <Button
-                  onClick={() => setShowAddExperience(true)}
-                        className="mt-4 sleek-button"
-                >
-                        Add Your First Experience
-                </Button>
-              )}
-                  </div>
-                ) : (
-                  <>
-                    {isOwnProfile && (
-                      <div className="flex justify-end mb-6">
-                        <Button
-                          onClick={() => setShowAddExperience(true)}
-                          variant="sleek"
-                        >
-                          Share Experience
-                        </Button>
-                      </div>
-                    )}
-                    <div className="space-y-6">
-                  {experiences.map((exp: Experience) => (
-                        <div key={exp.id} className="modern-card bg-white">
-                          <div className="relative gradient-overlay">
-                            {exp.image_url ? (
-                        <img
-                          src={exp.image_url}
-                          alt={exp.title}
-                                className="w-full h-56 object-cover"
-                                onError={(e) => {
-                                  e.currentTarget.src = 'https://images.unsplash.com/photo-1527631746610-bca00a040d60?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=1000&q=80';
-                                }}
-                              />
-                            ) : (
-                              <div className="w-full h-56 bg-gray-100 flex items-center justify-center">
-                                <Camera className="h-12 w-12 text-gray-300" />
-                          </div>
-                            )}
-                            
-                            <Badge className="absolute top-3 right-3 pill-badge bg-white/80 text-gray-800 hover:bg-white/90 z-10">
-                              Travel
-                            </Badge>
-                            
-                          {isOwnProfile && (
-                            <Button
-                              variant="ghost"
-                                size="icon"
-                                className="absolute top-3 left-3 h-8 w-8 rounded-full bg-white/80 hover:bg-white/90 z-10"
-                              onClick={() => handleDeleteExperience(exp.id)}
-                            >
-                              <X className="w-4 h-4" />
-                            </Button>
-                          )}
-                        </div>
-                          <div className="p-4">
-                            <div>
-                              <h3 className="font-semibold text-lg text-gray-900">{exp.title}</h3>
-                              <p className="text-gray-600 flex items-center mt-1">
-                                <MapPin className="h-4 w-4 mr-1 text-blue-500" /> {exp.location}
-                              </p>
-                            </div>
-                            <div 
-                              className="mt-3 text-gray-700 cursor-pointer"
-                              onClick={(e) => {
-                                const target = e.currentTarget;
-                                target.classList.toggle('line-clamp-3');
-                              }}
-                            >
-                              <p className="line-clamp-3">{exp.description}</p>
-                            </div>
-                            <div className="mt-4 flex justify-between items-center">
-                              <div className="flex space-x-2">
-                              <p className="text-xs text-gray-500">
-                                {new Date(exp.created_at).toLocaleDateString('en-US', { 
-                                  month: 'short', 
-                                  day: 'numeric', 
-                                  year: 'numeric' 
-                                })}
-                              </p>
-                              </div>
-                            </div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                  </>
-              )}
-            </div>
             )}
+        
+            {/* Stats */}
+            <div className="mt-6 flex justify-center md:justify-start space-x-8">
+                <button
+                onClick={() => setShowFollowers(true)}
+                className="flex flex-col items-center hover:text-purple-600 transition-colors"
+              >
+                <span className="text-xl font-semibold">{profileData?.followers_count || 0}</span>
+                <span className="text-sm text-gray-500">Followers</span>
+                </button>
+              
+                <button
+                onClick={() => setShowFollowing(true)}
+                className="flex flex-col items-center hover:text-purple-600 transition-colors"
+              >
+                <span className="text-xl font-semibold">{profileData?.following_count || 0}</span>
+                <span className="text-sm text-gray-500">Following</span>
+                </button>
+              
+              <div className="flex flex-col items-center">
+                <span className="text-xl font-semibold">{experiences.length}</span>
+                <span className="text-sm text-gray-500">Experiences</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        </div>
+        
+      {/* Content tabs with updated styling */}
+      <div className="container max-w-4xl mx-auto px-4 mt-6">
+        <Tabs 
+          defaultValue={activeTab}
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="w-full"
+        >
+          <TabsList className="grid w-full grid-cols-3 bg-gray-100 rounded-lg p-1">
+            <TabsTrigger 
+              value="experiences"
+              className="rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+            >
+              <Grid className="h-4 w-4 mr-2" /> 
+              Experiences
+            </TabsTrigger>
+            <TabsTrigger 
+              value="created"
+              className="rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+            >
+              <MapIcon className="h-4 w-4 mr-2" /> 
+              Created Trips
+            </TabsTrigger>
+            <TabsTrigger 
+              value="joined"
+              className="rounded-md data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white"
+            >
+              <Bookmark className="h-4 w-4 mr-2" /> 
+              Joined Trips
+            </TabsTrigger>
+          </TabsList>
           
-            {activeTab === 'created' && (
-              <div>
-            {createdTrips.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No trips created yet</p>
+          {/* Experience tab content */}
+          <TabsContent value="experiences" className="mt-6">
+              {isOwnProfile && (
+              <div className="mb-6">
+                <Button
+                  variant="brand"
+                  onClick={() => setShowAddExperience(true)}
+                >
+                  <PlusCircle className="h-4 w-4 mr-2" />
+                  Add New Experience
+                </Button>
+                  </div>
+            )}
+            
+            {experiences.length === 0 ? (
+              <div className="text-center py-10 bg-purple-50 rounded-lg border border-purple-100">
+                <Grid className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-800 mb-1">No experiences shared yet</h3>
+                <p className="text-gray-600">
+                  {isOwnProfile
+                    ? "Share your travel experiences with others"
+                    : `${profileData?.name} hasn't shared any experiences yet`}
+                </p>
                 {isOwnProfile && (
                   <Button
+                    variant="brand"
+                    className="mt-4"
+                    onClick={() => setShowAddExperience(true)}
+                  >
+                    Share Your First Experience
+                  </Button>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {experiences.map((exp) => renderExperienceCard(exp))}
+              </div>
+            )}
+          </TabsContent>
+          
+          {/* Created Trips tab content with updated styling */}
+          <TabsContent value="created" className="mt-6">
+            {createdTrips.length === 0 ? (
+              <div className="text-center py-10 bg-purple-50 rounded-lg border border-purple-100">
+                <MapIcon className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-800 mb-1">No created trips</h3>
+                <p className="text-gray-600">
+                  {isOwnProfile
+                    ? "Create a trip to invite others to join you"
+                    : `${profileData?.name} hasn't created any trips yet`}
+                </p>
+                {isOwnProfile && (
+                  <Button
+                    variant="brand"
+                    className="mt-4"
                     onClick={() => navigate('/create')}
-                        className="mt-4 sleek-button"
                   >
                     Create Your First Trip
                   </Button>
                 )}
               </div>
             ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {createdTrips.map(renderTripCard)}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {createdTrips.map((trip) => renderTripCard(trip))}
               </div>
             )}
-              </div>
-            )}
+          </TabsContent>
           
-            {activeTab === 'joined' && (
-              <div>
+          {/* Joined Trips tab content with updated styling */}
+          <TabsContent value="joined" className="mt-6">
             {joinedTrips.length === 0 ? (
-              <div className="text-center py-8">
-                <p className="text-gray-600">No trips joined yet</p>
+              <div className="text-center py-10 bg-purple-50 rounded-lg border border-purple-100">
+                <Bookmark className="h-12 w-12 text-purple-400 mx-auto mb-3" />
+                <h3 className="text-lg font-medium text-gray-800 mb-1">No joined trips</h3>
+                <p className="text-gray-600">
+                  {isOwnProfile
+                    ? "Join trips created by other travelers"
+                    : `${profileData?.name} hasn't joined any trips yet`}
+                </p>
                 {isOwnProfile && (
                   <Button
-                    onClick={() => navigate('/trips')}
-                        className="mt-4 sleek-button"
+                    variant="brand"
+                    className="mt-4"
+                    onClick={() => navigate('/explore')}
                   >
                     Explore Trips
                   </Button>
                 )}
               </div>
             ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {joinedTrips.map(renderTripCard)}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {joinedTrips.map((trip) => renderTripCard(trip))}
               </div>
             )}
-              </div>
-            )}
-          </div>
+          </TabsContent>
+        </Tabs>
         </div>
         
         {/* Add Experience Dialog */}
-        {isOwnProfile && (
           <AddExperienceDialog
-            isOpen={showAddExperience}
-            onClose={() => setShowAddExperience(false)}
+        open={showAddExperience}
+        onOpenChange={setShowAddExperience}
             onExperienceAdded={handleExperienceAdded}
           />
+      
+      {/* Edit Profile Dialog - with brand colors */}
+      {isEditMode && (
+        <Dialog open={isEditMode} onOpenChange={setIsEditMode}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+                Edit Your Profile
+              </DialogTitle>
+            </DialogHeader>
+            
+            <div className="space-y-4 mt-4">
+              <div>
+                <Label htmlFor="name">Name</Label>
+                <Input
+                  id="name"
+                  name="name"
+                  value={editForm.name || ''}
+                  onChange={(e) => handleInputChange('name', e.target.value)}
+                  className="form-input border-purple-200 focus:border-purple-500"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="bio">Bio</Label>
+                <Textarea
+                  id="bio"
+                  name="bio"
+                  value={editForm.bio || ''}
+                  onChange={(e) => handleInputChange('bio', e.target.value)}
+                  className="form-textarea min-h-32 border-purple-200 focus:border-purple-500"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="location">Location</Label>
+                <div className="relative">
+                  <MapPin className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="location"
+                    name="location"
+                    placeholder="City, Country"
+                    value={editForm.location || ''}
+                    onChange={(e) => handleInputChange('location', e.target.value)}
+                    className="form-input pl-9 border-purple-200 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="instagram">Instagram (Optional)</Label>
+                <div className="relative">
+                  <Instagram className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="instagram"
+                    name="instagram"
+                    placeholder="Your Instagram username"
+                    value={editForm.instagram || ''}
+                    onChange={(e) => handleInputChange('instagram', e.target.value)}
+                    className="form-input pl-9 border-purple-200 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+              
+              <div>
+                <Label htmlFor="linkedin">LinkedIn (Optional)</Label>
+                <div className="relative">
+                  <Linkedin className="absolute left-3 top-2.5 h-4 w-4 text-gray-500" />
+                  <Input
+                    id="linkedin"
+                    name="linkedin"
+                    placeholder="Your LinkedIn profile URL"
+                    value={editForm.linkedin || ''}
+                    onChange={(e) => handleInputChange('linkedin', e.target.value)}
+                    className="form-input pl-9 border-purple-200 focus:border-purple-500"
+                  />
+                </div>
+              </div>
+            </div>
+            
+            <div className="flex justify-end space-x-2 mt-4">
+              <Button
+                variant="outline"
+                onClick={() => setIsEditMode(false)}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="brand"
+                onClick={handleSaveProfile}
+                disabled={isSaving}
+              >
+                {isSaving ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    Saving...
+                  </>
+                ) : (
+                  <>
+                    <Save className="mr-2 h-4 w-4" />
+                    Save Changes
+                  </>
+                )}
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         )}
         
         {/* Followers Dialog */}
@@ -1711,7 +1755,6 @@ const Profile = () => {
         
         {/* Following Dialog */}
         {renderFollowingDialog()}
-      </div>
     </div>
   );
 };
