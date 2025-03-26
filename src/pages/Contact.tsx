@@ -5,7 +5,7 @@ import { Input } from '../components/ui/input';
 import { Textarea } from '../components/ui/textarea';
 import { Label } from '../components/ui/label';
 import { useNavigate } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
+import { Header } from '../components/Header';
 import { useToast } from '../components/ui/use-toast';
 
 const Contact = () => {
@@ -52,7 +52,7 @@ const Contact = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <AppHeader />
+      <Header />
       
       {/* Sub Header */}
       <div className="bg-white p-4 flex items-center border-b">

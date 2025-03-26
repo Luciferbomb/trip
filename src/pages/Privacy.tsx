@@ -2,7 +2,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { useNavigate } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
+import { Header } from '../components/Header';
 
 const Privacy = () => {
   const navigate = useNavigate();
@@ -10,7 +10,7 @@ const Privacy = () => {
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
-      <AppHeader />
+      <Header />
       
       {/* Sub Header */}
       <div className="bg-white p-4 flex items-center border-b">

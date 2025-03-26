@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, MapPin, Filter, Loader2, RefreshCw, Users, Compass, BookOpen } from 'lucide-react';
+import { Search, MapPin, Filter, Loader2, RefreshCw, Users, Compass, BookOpen, Server, AlertCircle, X } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { useNavigate, useSearchParams } from 'react-router-dom';
@@ -16,6 +16,7 @@ import { TravelDestinationCard } from '../components/TravelDestinationCard';
 import { useAuth } from '@/lib/auth-context';
 import { useToast } from '@/components/ui/use-toast';
 import MapboxSearch from '@/components/MapboxSearch';
+import VerificationBadge from '@/components/VerificationBadge';
 
 // Safe import of useInView with fallback
 let useInViewImported;
@@ -50,6 +51,7 @@ interface Trip {
   creator_name: string;
   creator_image: string;
   creator_username: string;
+  creator_is_verified?: boolean;
   status: string;
   participants_count?: number;
   tags?: string[];
@@ -67,6 +69,7 @@ interface Experience {
     name: string;
     profile_image: string;
     username: string;
+    is_verified?: boolean;
   };
   categories?: string[];
 }
@@ -78,6 +81,7 @@ interface User {
   profile_image: string;
   bio?: string;
   location?: string;
+  is_verified?: boolean;
 }
 
 const PAGE_SIZE = 12;
@@ -115,12 +119,104 @@ const Explore = () => {
     'Mountains', 'Photography', 'History', 'Art', 'Music'
   ];
 
-  // Available locations for filtering
-  const availableLocations = [
-    'New York', 'London', 'Tokyo', 'Paris', 'Sydney',
-    'Dubai', 'Singapore', 'Mumbai', 'Berlin', 'Toronto'
-  ];
+  // At the top of the component, add these state variables
+  const [locationSearchQuery, setLocationSearchQuery] = useState('');
+  const [isLoadingLocations, setIsLoadingLocations] = useState(false);
+  const [availableLocations, setAvailableLocations] = useState<string[]>([]);
+
+  // Add this useEffect to fetch popular locations on component mount
+  useEffect(() => {
+    // Fetch unique locations from trips and experiences
+    const fetchLocations = async () => {
+      setIsLoadingLocations(true);
+      try {
+        // Get unique locations from trips
+        const { data: tripLocations, error: tripError } = await supabase
+          .from('trips')
+          .select('location')
+          .not('location', 'is', null);
+        
+        // Get unique locations from experiences
+        const { data: expLocations, error: expError } = await supabase
+          .from('experiences')
+          .select('location')
+          .not('location', 'is', null);
+        
+        if (tripError) console.error('Error fetching trip locations:', tripError);
+        if (expError) console.error('Error fetching experience locations:', expError);
+        
+        // Combine and deduplicate locations
+        const tripLocs = tripLocations?.map(t => t.location) || [];
+        const expLocs = expLocations?.map(e => e.location) || [];
+        const allLocations = [...new Set([...tripLocs, ...expLocs])];
+        
+        // Sort by most frequent first
+        const locationCounts = allLocations.reduce((acc, loc) => {
+          acc[loc] = (acc[loc] || 0) + 1;
+          return acc;
+        }, {} as Record<string, number>);
+        
+        const sortedLocations = allLocations
+          .sort((a, b) => locationCounts[b] - locationCounts[a])
+          .slice(0, 20); // Limit to 20 most popular locations
+        
+        setAvailableLocations(sortedLocations);
+      } catch (error) {
+        console.error('Error fetching locations:', error);
+      } finally {
+        setIsLoadingLocations(false);
+      }
+    };
+    
+    fetchLocations();
+  }, []);
   
+  // Add this function to search for locations
+  const searchLocations = async (query: string) => {
+    if (!query.trim()) return;
+    
+    setIsLoadingLocations(true);
+    try {
+      // Search for locations that match the query
+      const { data: tripLocations, error: tripError } = await supabase
+        .from('trips')
+        .select('location')
+        .ilike('location', `%${query}%`)
+        .not('location', 'is', null);
+      
+      const { data: expLocations, error: expError } = await supabase
+        .from('experiences')
+        .select('location')
+        .ilike('location', `%${query}%`)
+        .not('location', 'is', null);
+      
+      if (tripError) console.error('Error searching trip locations:', tripError);
+      if (expError) console.error('Error searching experience locations:', expError);
+      
+      // Combine and deduplicate locations
+      const tripLocs = tripLocations?.map(t => t.location) || [];
+      const expLocs = expLocations?.map(e => e.location) || [];
+      const searchResults = [...new Set([...tripLocs, ...expLocs])];
+      
+      setAvailableLocations(searchResults.slice(0, 20));
+    } catch (error) {
+      console.error('Error searching locations:', error);
+    } finally {
+      setIsLoadingLocations(false);
+    }
+  };
+  
+  // Debounce the search input
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (locationSearchQuery.trim()) {
+        searchLocations(locationSearchQuery);
+      }
+    }, 300);
+    
+    return () => clearTimeout(timer);
+  }, [locationSearchQuery]);
+
   // Fetch data based on active tab
   const fetchData = async ({ pageParam = 0 }) => {
     try {
@@ -404,22 +500,48 @@ const Explore = () => {
             <div className="space-y-6 mt-3 bg-white p-6 rounded-lg border border-gray-200 shadow-sm">
               {/* Location Filter */}
               <div>
-                <label className="text-sm font-medium text-gray-700 mb-3 block">
+                <label className="text-sm font-medium text-gray-700 mb-2 block">
                   Location
                 </label>
-                <div className="flex flex-wrap gap-3 max-h-32 overflow-y-auto pb-2 px-1">
-                  {availableLocations.map((location) => (
-                    <Badge
-                      key={location}
-                      variant={selectedLocation === location ? 'default' : 'outline'}
-                      className={`cursor-pointer py-1.5 px-3 ${selectedLocation === location ? 'bg-blue-600 hover:bg-blue-700' : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'}`}
-                      onClick={() => setSelectedLocation(
-                        selectedLocation === location ? null : location
-                      )}
-                    >
-                      {location}
-                    </Badge>
-                  ))}
+                <div className="mb-2">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 h-4 w-4" />
+                    <Input
+                      type="text"
+                      placeholder="Search locations..."
+                      className="pl-10 text-sm"
+                      value={locationSearchQuery}
+                      onChange={(e) => setLocationSearchQuery(e.target.value)}
+                    />
+                  </div>
+                </div>
+                <div className="flex flex-wrap gap-2 max-h-32 overflow-y-auto pb-2 px-1">
+                  {isLoadingLocations ? (
+                    <div className="w-full flex justify-center py-2">
+                      <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
+                    </div>
+                  ) : availableLocations.length > 0 ? (
+                    availableLocations.map((location) => (
+                      <Badge
+                        key={location}
+                        variant={selectedLocation === location ? 'default' : 'outline'}
+                        className={`cursor-pointer py-1.5 px-3 ${
+                          selectedLocation === location 
+                            ? 'bg-blue-600 hover:bg-blue-700' 
+                            : 'bg-white text-gray-700 hover:bg-gray-100 border-gray-300'
+                        }`}
+                        onClick={() => setSelectedLocation(
+                          selectedLocation === location ? null : location
+                        )}
+                      >
+                        {location}
+                      </Badge>
+                    ))
+                  ) : (
+                    <div className="text-sm text-gray-500 py-2 w-full text-center">
+                      {locationSearchQuery ? "No locations found" : "Popular locations will appear here"}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -556,11 +678,12 @@ const Explore = () => {
                 creatorImage={trip.creator_image || ''} 
                 creatorId={trip.creator_id || ''}
                 creatorUsername={trip.creator_username || 'user'}
+                creatorIsVerified={trip.creator_is_verified}
                 itemType="trip"
                 onClick={() => navigate(`/trips/${trip.id}`)}
               />
             ))}
-
+            
             {/* Render Experiences */}
             {(activeTab === 'all' || activeTab === 'experiences') && allItems.experiences.map(experience => (
               <TravelDestinationCard
@@ -570,13 +693,15 @@ const Explore = () => {
                 description={experience.title || 'Untitled experience'}
                 creatorName={experience.user?.name || 'Anonymous'}
                 creatorImage={experience.user?.profile_image || ''}
+                creatorId={experience.user_id || ''}
                 creatorUsername={experience.user?.username || 'user'}
+                creatorIsVerified={experience.user?.is_verified}
                 itemType="experience" 
                 onClick={() => navigate(`/experiences/${experience.id}`)}
               />
             ))}
-
-            {/* Render Users - Improved card design */}
+            
+            {/* Render Users */}
             {(activeTab === 'all' || activeTab === 'people') && allItems.users.map(user => (
               <Link
                 key={`user-${user.id}`}
@@ -591,7 +716,14 @@ const Explore = () => {
                     </AvatarFallback>
                   </Avatar>
                   <div>
-                    <h3 className="font-semibold text-gray-800 text-lg">{user.name}</h3>
+                    <div className="flex items-center justify-center">
+                      <h3 className="font-semibold text-gray-800 text-lg">{user.name}</h3>
+                      {user.is_verified && (
+                        <span className="ml-1">
+                          <VerificationBadge size="sm" />
+                        </span>
+                      )}
+                    </div>
                     <p className="text-sm text-blue-600">@{user.username}</p>
                     {user.location && (
                       <div className="flex items-center justify-center text-gray-500 text-sm mt-1">
@@ -620,29 +752,9 @@ const Explore = () => {
             ))}
           </div>
         </div>
-
-        {/* Infinite scroll loading indicator */}
-        {(!isLoading && !error && hasNextPage) && (
-          <div 
-            ref={ref || undefined} 
-            className="flex justify-center items-center py-8"
-          >
-            {isFetchingNextPage ? (
-              <div className="flex items-center">
-                <div className="relative mr-3">
-                  <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-400 to-indigo-400 animate-pulse blur-sm opacity-50"></div>
-                  <Loader2 className="w-5 h-5 animate-spin text-blue-600 relative" />
-                </div>
-                <span className="text-gray-600">Loading more...</span>
-              </div>
-            ) : (
-              <div className="h-10" />
-            )}
-          </div>
-        )}
       </div>
     </div>
   );
 };
 
-export default Explore; 
+export default Explore;

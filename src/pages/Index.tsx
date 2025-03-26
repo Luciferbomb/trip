@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import Header from '@/components/Header';
+import { Header } from '@/components/Header';
 import { Link, useNavigate } from 'react-router-dom';
 import TripCard from '@/components/TripCard';
 import ExperienceCard from '@/components/ExperienceCard';
@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge';
 import { TravelDestinationCard } from '../components/TravelDestinationCard';
 import { TravelTestimonials } from '../components/TravelTestimonials';
 import { BottomNav } from '@/components/BottomNav';
+import { runMigrations } from '@/lib/migrations';
 
 interface Profile {
   id: string;
@@ -144,6 +145,21 @@ const Index = () => {
   const [activeTab, setActiveTab] = useState('all');
   const [suggestedUsers, setSuggestedUsers] = useState<Profile[]>([]);
   const [loading, setLoading] = useState(true);
+
+  // Run migrations when the app starts
+  useEffect(() => {
+    const setupDatabase = async () => {
+      try {
+        console.log('Checking and setting up database tables...');
+        const result = await runMigrations(false);
+        console.log('Database setup result:', result);
+      } catch (error) {
+        console.error('Error setting up database:', error);
+      }
+    };
+    
+    setupDatabase();
+  }, []);
 
   // Fetch suggested users to follow
   useEffect(() => {

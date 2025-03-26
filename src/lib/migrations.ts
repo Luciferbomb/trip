@@ -66,6 +66,9 @@ CREATE TABLE IF NOT EXISTS users (
   followers_count INTEGER DEFAULT 0,
   following_count INTEGER DEFAULT 0,
   onboarding_completed BOOLEAN DEFAULT FALSE,
+  is_verified BOOLEAN DEFAULT FALSE,
+  verification_reason TEXT,
+  verification_date TIMESTAMP WITH TIME ZONE,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
@@ -216,6 +219,16 @@ CREATE TABLE IF NOT EXISTS experience_comments (
   comment TEXT NOT NULL,
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
   updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+`;
+
+// Create the admins table
+const createAdminsTableSQL = `
+CREATE TABLE IF NOT EXISTS admins (
+  id TEXT PRIMARY KEY REFERENCES users(id),
+  email TEXT NOT NULL,
+  is_admin BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 `;
 
@@ -843,6 +856,9 @@ export const runMigrations = async (insertSamples: boolean = false): Promise<boo
     
     // Make sure onboarding_completed field exists
     await addOnboardingCompletedField();
+    
+    // Create admins table
+    await executeSQL(createAdminsTableSQL);
     
     console.log('All migrations completed successfully');
     return true;

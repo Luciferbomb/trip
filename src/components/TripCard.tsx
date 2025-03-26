@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Calendar, Users, MapPin, ArrowRight, UserPlus, UserMinus, Loader2, Clock, ChevronRight } from 'lucide-react';
+import { Calendar, Users, MapPin, Loader2, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Link, useNavigate } from 'react-router-dom';
@@ -7,8 +7,9 @@ import { cn } from '@/lib/utils';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
 import { useToast } from '@/components/ui/use-toast';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Avatar } from '@/components/ui/avatar';
 import { format } from 'date-fns';
+import { PremiumCard } from './ui/premium-card';
 
 export interface TripCardProps {
   id: string;
@@ -76,54 +77,6 @@ const TripCard: React.FC<TripCardProps> = ({
     }
   };
 
-  const handleFollow = async (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    
-    if (!user) {
-      navigate('/login');
-      return;
-    }
-    
-    setIsLoading(true);
-    
-    try {
-      if (isFollowing) {
-        await supabase
-          .from('followers')
-          .delete()
-          .eq('follower_id', user.id)
-          .eq('following_id', creatorId);
-        
-        setIsFollowing(false);
-        toast({
-          title: "Unfollowed",
-          description: `You are no longer following ${creatorName}`,
-        });
-      } else {
-        await supabase
-          .from('followers')
-          .insert([
-            { follower_id: user.id, following_id: creatorId }
-          ]);
-        
-        setIsFollowing(true);
-        toast({
-          title: "Following!",
-          description: `You are now following ${creatorName}`,
-        });
-      }
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "There was an error updating your follow status",
-        variant: "destructive",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const formatDate = (dateString: string) => {
     try {
       return format(new Date(dateString), 'MMM d, yyyy');
@@ -135,42 +88,55 @@ const TripCard: React.FC<TripCardProps> = ({
   const fallbackImageUrl = "https://images.unsplash.com/photo-1682687218147-9806132dc697?q=80&w=1470&auto=format&fit=crop";
 
   return (
-    <Link 
-      to={`/trips/${id}`} 
-      className="block group"
-    >
-      <div className="bg-white rounded-2xl border border-gray-200 overflow-hidden transition-all duration-300 hover:scale-[1.02] hover:shadow-xl">
-        {/* Image Container */}
-        <div className="relative aspect-[16/9] overflow-hidden">
+    <Link to={`/trips/${id}`} className="block group">
+      <PremiumCard 
+        variant={featured ? "gradient" : "default"}
+        className="overflow-hidden"
+      >
+        {/* Image Container with Premium Overlay */}
+        <div className="relative -mt-6 -mx-6 mb-6 aspect-[16/9] overflow-hidden rounded-t-xl">
           {!imageError ? (
             <img 
               src={image} 
               alt={title} 
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               onError={() => setImageError(true)}
             />
           ) : (
             <img 
               src={fallbackImageUrl} 
               alt={title} 
-              className="w-full h-full object-cover transition-transform duration-300 hover:scale-105"
+              className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
             />
           )}
-          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+          <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"></div>
           
-          {/* Creator Info - Overlaid on image */}
+          {/* Creator Info - Premium Style */}
           <div className="absolute bottom-4 left-4 flex items-center">
-            <img
-              src={creatorImage}
-              alt={creatorName}
-              className="w-8 h-8 rounded-full border-2 border-white object-cover"
-            />
-            <span className="ml-2 text-white text-sm font-medium">{creatorName}</span>
+            <Avatar className="h-8 w-8 border-2 border-white/50 shadow-lg">
+              <img src={creatorImage} alt={creatorName} className="object-cover" />
+            </Avatar>
+            <div className="ml-2">
+              <span className="text-white text-sm font-medium">{creatorName}</span>
+              <Badge 
+                variant="outline" 
+                className="ml-2 bg-white/10 backdrop-blur-sm border-white/20 text-white"
+              >
+                Host
+              </Badge>
+            </div>
           </div>
           
-          {/* Spots Badge - Top Right */}
+          {/* Spots Badge - Premium Style */}
           <div className="absolute top-4 right-4">
-            <Badge variant="outline" className="bg-white/90 backdrop-blur-sm border-white text-gray-900">
+            <Badge 
+              variant="outline" 
+              className={cn(
+                "bg-white/90 backdrop-blur-sm border-white/50 text-gray-900",
+                "shadow-[0_2px_10px_rgba(0,0,0,0.1)]",
+                spotsLeft <= 2 && "bg-red-50 text-red-600 border-red-200"
+              )}
+            >
               <Users className="w-3.5 h-3.5 mr-1" />
               {spotsLeft} {spotsLeft === 1 ? 'spot' : 'spots'} left
             </Badge>
@@ -178,31 +144,31 @@ const TripCard: React.FC<TripCardProps> = ({
         </div>
         
         {/* Content */}
-        <div className="p-4">
-          <div className="mb-3">
-            <h3 className="text-lg font-semibold text-gray-900 mb-1 line-clamp-1">{title}</h3>
+        <div className="space-y-4">
+          <div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2 line-clamp-1">{title}</h3>
             <div className="flex items-center text-gray-600">
-              <MapPin className="w-4 h-4 mr-1" />
-              <span className="text-sm">{location}</span>
+              <MapPin className="w-4 h-4 mr-1.5" />
+              <span className="text-sm font-medium">{location}</span>
             </div>
           </div>
           
-          {/* Date Range */}
-          <div className="flex items-center text-gray-600 mb-3">
-            <Calendar className="w-4 h-4 mr-1" />
-            <span className="text-sm">
+          {/* Date Range - Premium Style */}
+          <div className="flex items-center text-gray-600 bg-gray-50/50 rounded-lg p-2">
+            <Calendar className="w-4 h-4 mr-2 text-gray-500" />
+            <span className="text-sm font-medium">
               {formatDate(startDate)} - {formatDate(endDate)}
             </span>
           </div>
           
-          {/* Activities */}
+          {/* Activities - Premium Style */}
           {activities.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-4">
+            <div className="flex flex-wrap gap-2">
               {activities.slice(0, 3).map((activity, index) => (
                 <Badge 
                   key={index}
                   variant="outline"
-                  className="bg-blue-50 border-blue-200 text-blue-700 text-xs"
+                  className="bg-blue-50/50 border-blue-200/50 text-blue-700 text-xs backdrop-blur-sm"
                 >
                   {activity}
                 </Badge>
@@ -210,7 +176,7 @@ const TripCard: React.FC<TripCardProps> = ({
               {activities.length > 3 && (
                 <Badge 
                   variant="outline"
-                  className="bg-blue-50 border-blue-200 text-blue-700 text-xs"
+                  className="bg-gray-50/50 border-gray-200/50 text-gray-600 text-xs backdrop-blur-sm"
                 >
                   +{activities.length - 3} more
                 </Badge>
@@ -218,16 +184,20 @@ const TripCard: React.FC<TripCardProps> = ({
             </div>
           )}
           
-          {/* View Details Button */}
+          {/* View Details Button - Premium Style */}
           <Button 
             variant="outline" 
-            className="w-full border-gray-200 text-gray-700 hover:bg-gray-50 group-hover:border-gray-300 transition-all duration-200"
+            className={cn(
+              "w-full border-gray-200 bg-white/50 backdrop-blur-sm",
+              "hover:bg-white hover:border-gray-300 transition-all duration-300",
+              "text-gray-900 font-medium"
+            )}
           >
             View Details
-            <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-0.5 transition-transform" />
+            <ChevronRight className="w-4 h-4 ml-1 group-hover:translate-x-1 transition-transform duration-300" />
           </Button>
         </div>
-      </div>
+      </PremiumCard>
     </Link>
   );
 };

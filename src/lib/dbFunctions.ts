@@ -13,14 +13,47 @@ export const updateParticipantStatus = async (
   newStatus: string
 ): Promise<{ success: boolean; error: Error | null }> => {
   try {
-    // First get the participant to get their user_id
+    console.log(`Updating participant ${participantId} to ${newStatus} for trip ${tripId}`);
+    
+    // First get the participant to get their current status and user_id
     const { data: participant, error: getError } = await supabase
       .from('trip_participants')
-      .select('user_id')
+      .select('user_id, status')
       .eq('id', participantId)
       .single();
       
-    if (getError) throw getError;
+    if (getError) {
+      console.error('Error getting participant:', getError);
+      throw getError;
+    }
+    
+    if (!participant) {
+      throw new Error('Participant not found');
+    }
+    
+    // Check if we're actually changing the status
+    if (participant.status === newStatus) {
+      console.log('Status already set to', newStatus);
+      return { success: true, error: null };
+    }
+    
+    // Check if the trip has space available if approving
+    if (newStatus === 'approved' && participant.status !== 'approved') {
+      const { data: tripData, error: tripError } = await supabase
+        .from('trips')
+        .select('spots, spots_filled')
+        .eq('id', tripId)
+        .single();
+        
+      if (tripError) {
+        console.error('Error checking trip space:', tripError);
+        throw tripError;
+      }
+      
+      if (tripData.spots_filled >= tripData.spots) {
+        throw new Error('Trip is already full');
+      }
+    }
     
     // Update the participant status
     const { error: updateError } = await supabase
@@ -31,31 +64,56 @@ export const updateParticipantStatus = async (
       })
       .eq('id', participantId);
 
-    if (updateError) throw updateError;
+    if (updateError) {
+      console.error('Error updating participant status:', updateError);
+      throw updateError;
+    }
 
-    // Then update the spots_filled count
-    const { data: approvedCount, error: countError } = await supabase
-      .from('trip_participants')
-      .select('id', { count: 'exact', head: false })
-      .eq('trip_id', tripId)
-      .eq('status', 'approved');
-
-    if (countError) throw countError;
-
-    const { error: tripUpdateError } = await supabase
-      .from('trips')
-      .update({ 
-        spots_filled: approvedCount 
-      })
-      .eq('id', tripId);
-
-    if (tripUpdateError) throw tripUpdateError;
+    // Calculate the spots filled delta
+    let spotsDelta = 0;
+    
+    if (newStatus === 'approved' && participant.status !== 'approved') {
+      // Adding an approved participant
+      spotsDelta = 1;
+    } else if (newStatus !== 'approved' && participant.status === 'approved') {
+      // Removing an approved participant
+      spotsDelta = -1;
+    }
+    
+    // Only update spots_filled if there's a change
+    if (spotsDelta !== 0) {
+      // Then update the spots_filled count
+      const { data: approvedCount, error: countError } = await supabase
+        .from('trip_participants')
+        .select('id', { count: 'exact', head: false })
+        .eq('trip_id', tripId)
+        .eq('status', 'approved');
+  
+      if (countError) {
+        console.error('Error counting approved participants:', countError);
+        throw countError;
+      }
+  
+      const { error: tripUpdateError } = await supabase
+        .from('trips')
+        .update({ 
+          spots_filled: approvedCount,
+          updated_at: new Date().toISOString() 
+        })
+        .eq('id', tripId);
+  
+      if (tripUpdateError) {
+        console.error('Error updating trip spots_filled:', tripUpdateError);
+        throw tripUpdateError;
+      }
+    }
     
     // If the participant was approved, ensure they have access to the chat
     if (newStatus === 'approved') {
       await ensureChatAccess(tripId, participant.user_id);
     }
 
+    console.log('Participant status updated successfully to', newStatus);
     return { success: true, error: null };
   } catch (error) {
     console.error('Error updating participant status:', error);

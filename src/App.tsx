@@ -21,7 +21,7 @@ import { cn } from './lib/utils';
 import { AuthProvider, useAuth } from './lib/auth-context';
 import ToastProvider from './components/ToastProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import AppHeader from '@/components/AppHeader';
+import { Header } from './components/Header';
 import DesktopRestriction from './components/DesktopRestriction';
 import { Toaster } from './components/ui/toaster';
 
@@ -60,6 +60,7 @@ import { BottomNav } from './components/BottomNav';
 import ChatDemo from './pages/ChatDemo';
 import Debug from './pages/debug';
 import UIShowcase from './pages/ui-showcase';
+import AdminPanel from "./pages/AdminPanel";
 
 // Create a client for react-query
 const queryClient = new QueryClient({
@@ -146,6 +147,20 @@ if (!document.getElementById('dancing-script-font')) {
   document.head.appendChild(link);
 }
 
+// Reusable loading component
+const LoadingScreen = () => (
+  <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+    <div className="relative">
+      <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
+      <svg className="w-12 h-12 animate-spin text-blue-600 relative" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+      </svg>
+    </div>
+    <p className="text-gray-600 mt-4 font-medium">Loading...</p>
+  </div>
+);
+
 // Protected route component with onboarding check
 const ProtectedRoute = ({ children, requireOnboarding = true }: { children: React.ReactNode, requireOnboarding?: boolean }) => {
   const { user, loading } = useAuth();
@@ -196,18 +211,7 @@ const ProtectedRoute = ({ children, requireOnboarding = true }: { children: Reac
   }, [user, navigate, requireOnboarding]);
   
   if (loading || checkingOnboarding) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <div className="relative">
-          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
-          <svg className="w-12 h-12 animate-spin text-blue-600 relative" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
-        <p className="text-gray-600 mt-4 font-medium">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
   
   if (!user) {
@@ -266,18 +270,7 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
   
   if (loading || checkingOnboarding) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
-        <div className="relative">
-          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
-          <svg className="w-12 h-12 animate-spin text-blue-600 relative" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
-        </div>
-        <p className="text-gray-600 mt-4 font-medium">Loading...</p>
-      </div>
-    );
+    return <LoadingScreen />;
   }
   
   if (!user) {
@@ -394,7 +387,7 @@ const AppRoutes = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <>
       {dbError && (
         <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
           <strong className="font-bold">Database Error:</strong>
@@ -407,154 +400,157 @@ const AppRoutes = () => {
           </span>
         </div>
       )}
-      <div className="flex-grow px-4 pt-4">
-        <AnimatePresence mode="wait">
-          <Routes location={location} key={location.pathname}>
-            <Route path="/" element={
-              user ? (
-                <PageTransition>
-                  <Feed />
-                </PageTransition>
-              ) : (
-                <PageTransition>
-                  <LandingPage />
-                </PageTransition>
-              )
-            } />
-            <Route path="/login" element={
+      <AnimatePresence mode="wait">
+        <Routes location={location} key={location.pathname}>
+          <Route path="/" element={
+            user ? (
               <PageTransition>
-                <Login />
+                <Feed />
               </PageTransition>
-            } />
-            <Route path="/signup" element={
+            ) : (
               <PageTransition>
-                <SignUp />
+                <LandingPage />
               </PageTransition>
-            } />
-            <Route path="/reset-password" element={
+            )
+          } />
+          <Route path="/login" element={
+            <PageTransition>
+              <Login />
+            </PageTransition>
+          } />
+          <Route path="/signup" element={
+            <PageTransition>
+              <SignUp />
+            </PageTransition>
+          } />
+          <Route path="/reset-password" element={
+            <PageTransition>
+              <ResetPassword />
+            </PageTransition>
+          } />
+          <Route path="/email-confirmation" element={
+            <PageTransition>
+              <EmailConfirmation />
+            </PageTransition>
+          } />
+          <Route path="/onboarding" element={
+            <OnboardingRoute>
               <PageTransition>
-                <ResetPassword />
+                <Onboarding />
               </PageTransition>
-            } />
-            <Route path="/email-confirmation" element={
+            </OnboardingRoute>
+          } />
+          <Route path="/trips" element={
+            <ProtectedRoute>
               <PageTransition>
-                <EmailConfirmation />
+                <Trips />
               </PageTransition>
-            } />
-            <Route path="/onboarding" element={
-              <OnboardingRoute>
-                <PageTransition>
-                  <Onboarding />
-                </PageTransition>
-              </OnboardingRoute>
-            } />
-            <Route path="/trips" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Trips />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/profile" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Profile />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/profile/:username" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Profile />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/create" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <CreateTrip />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/trips/:id" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <TripDetails />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/trips/:id/edit" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <EditTrip />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/experiences" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Experiences />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/explore" element={
-              <ProtectedRoute requireOnboarding={false}>
-                <PageTransition>
-                  <Explore />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/about" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/profile" element={
+            <ProtectedRoute>
               <PageTransition>
-                <About />
+                <Profile />
               </PageTransition>
-            } />
-            <Route path="/terms" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/profile/:username" element={
+            <ProtectedRoute>
               <PageTransition>
-                <Terms />
+                <Profile />
               </PageTransition>
-            } />
-            <Route path="/privacy" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/create" element={
+            <ProtectedRoute>
               <PageTransition>
-                <Privacy />
+                <CreateTrip />
               </PageTransition>
-            } />
-            <Route path="/contact" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/trips/:id" element={
+            <ProtectedRoute>
               <PageTransition>
-                <Contact />
+                <TripDetails />
               </PageTransition>
-            } />
-            <Route path="/search" element={
-              <ProtectedRoute>
-                <PageTransition>
-                  <Search />
-                </PageTransition>
-              </ProtectedRoute>
-            } />
-            <Route path="/chat-demo" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/trips/:id/edit" element={
+            <ProtectedRoute>
               <PageTransition>
-                <ChatDemo />
+                <EditTrip />
               </PageTransition>
-            } />
-            <Route path="/debug" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/experiences" element={
+            <ProtectedRoute>
               <PageTransition>
-                <Debug />
+                <Experiences />
               </PageTransition>
-            } />
-            <Route path="/ui-showcase" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/explore" element={
+            <ProtectedRoute requireOnboarding={false}>
               <PageTransition>
-                <UIShowcase />
+                <Explore />
               </PageTransition>
-            } />
-            <Route path="*" element={
+            </ProtectedRoute>
+          } />
+          <Route path="/about" element={
+            <PageTransition>
+              <About />
+            </PageTransition>
+          } />
+          <Route path="/terms" element={
+            <PageTransition>
+              <Terms />
+            </PageTransition>
+          } />
+          <Route path="/privacy" element={
+            <PageTransition>
+              <Privacy />
+            </PageTransition>
+          } />
+          <Route path="/contact" element={
+            <PageTransition>
+              <Contact />
+            </PageTransition>
+          } />
+          <Route path="/search" element={
+            <ProtectedRoute>
               <PageTransition>
-                <NotFound />
+                <Search />
               </PageTransition>
-            } />
-          </Routes>
-        </AnimatePresence>
-      </div>
-    </div>
+            </ProtectedRoute>
+          } />
+          <Route path="/chat-demo" element={
+            <PageTransition>
+              <ChatDemo />
+            </PageTransition>
+          } />
+          <Route path="/debug" element={
+            <PageTransition>
+              <Debug />
+            </PageTransition>
+          } />
+          <Route path="/ui-showcase" element={
+            <PageTransition>
+              <UIShowcase />
+            </PageTransition>
+          } />
+          <Route path="/admin" element={
+            <ProtectedRoute>
+              <AdminPanel />
+            </ProtectedRoute>
+          } />
+          <Route path="*" element={
+            <PageTransition>
+              <NotFound />
+            </PageTransition>
+          } />
+        </Routes>
+      </AnimatePresence>
+    </>
   );
 };
 
@@ -563,13 +559,16 @@ const AppContent = () => {
   
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Global AppHeader - only shown once at the app level */}
-      {user && <AppHeader />}
-      <div className="max-w-md mx-auto">
-        <div className={user ? 'pb-24' : ''}>
+      {/* Global Header - only shown once at the app level */}
+      {user && <Header />}
+      <main className={cn(
+        "w-full mx-auto",
+        user ? "pt-16 pb-24" : "" // Add padding top when header is present
+      )}>
+        <div className="max-w-7xl mx-auto px-4">
           <AppRoutes />
         </div>
-      </div>
+      </main>
       {/* Bottom navigation - only shown when user is logged in */}
       {user && <BottomNav />}
     </div>
@@ -608,6 +607,14 @@ const App = () => {
     
     checkDatabase();
   }, []);
+  
+  if (!migrationChecked) {
+    return (
+      <div className="flex items-center justify-center min-h-screen">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-gray-900"></div>
+      </div>
+    );
+  }
   
   return (
     <QueryClientProvider client={queryClient}>

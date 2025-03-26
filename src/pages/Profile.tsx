@@ -23,6 +23,8 @@ import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 import { format } from 'date-fns';
+import VerificationBadge from '@/components/VerificationBadge';
+import InlineVerifiedBadge from '@/components/InlineVerifiedBadge';
 
 interface UserProfile {
   id: string;
@@ -39,6 +41,8 @@ interface UserProfile {
   followers_count: number;
   following_count: number;
   username: string;
+  is_verified?: boolean;
+  verification_reason?: string;
 }
 
 interface Follower {
@@ -122,6 +126,16 @@ interface DatabaseFollowingResponse {
 // Set Mapbox access token
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
+
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-gray-50 pb-20">
+    <BottomNav />
+    <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
+      <Loader2 className="h-12 w-12 text-hireyth-main animate-spin mb-4" />
+      <p className="text-gray-600 text-lg">Loading profile...</p>
+    </div>
+  </div>
+);
 
 const Profile = () => {
   const { username } = useParams<{ username: string }>();
@@ -233,16 +247,15 @@ const Profile = () => {
       console.log(`Fetching profile data for ${queryParam}=${queryValue}`);
       
       // Use a single query to fetch user data with all related counts
-      const { data: userResult, error: userError } = await supabase
-          .from('users')
+      const { data: userData, error: userError } = await supabase
+        .from('users')
         .select(`
-          *,
-          followers_count,
-          following_count,
-          experiences_count
+          id, name, username, email, phone, gender, location, profile_image, 
+          bio, instagram, linkedin, experiences_count, followers_count, 
+          following_count, is_verified, verification_reason
         `)
         .eq(queryParam, queryValue)
-          .single();
+        .single();
           
       if (userError) {
         console.error('Error fetching user:', userError);
@@ -264,7 +277,7 @@ const Profile = () => {
           return;
         }
         
-      if (!userResult) {
+      if (!userData) {
         setError('Could not find profile.');
         toast({
           title: 'Error',
@@ -275,15 +288,17 @@ const Profile = () => {
       }
       
       // Initialize counts to zero if they're null
-      const userData = {
-        ...userResult,
-        followers_count: userResult.followers_count || 0,
-        following_count: userResult.following_count || 0,
-        experiences_count: userResult.experiences_count || 0
+      const userDataWithCounts = {
+        ...userData,
+        followers_count: userData.followers_count || 0,
+        following_count: userData.following_count || 0,
+        experiences_count: userData.experiences_count || 0
       };
       
-      setProfileData(userData);
-      console.log('Profile data loaded:', userData);
+      setProfileData(userDataWithCounts);
+      console.log('Profile data loaded:', userDataWithCounts);
+      console.log('Verification status:', userDataWithCounts.is_verified);
+      console.log('Verification reason:', userDataWithCounts.verification_reason);
 
       // Fetch all related data in parallel for better performance
       try {
@@ -292,14 +307,14 @@ const Profile = () => {
           supabase
         .from('experiences')
         .select('*')
-        .eq('user_id', userData.id)
+        .eq('user_id', userDataWithCounts.id)
             .order('created_at', { ascending: false }),
 
           // Get created trips
           supabase
         .from('trips')
         .select('*')
-        .eq('creator_id', userData.id)
+        .eq('creator_id', userDataWithCounts.id)
             .order('created_at', { ascending: false }),
 
           // Get trips the user has joined
@@ -320,15 +335,15 @@ const Profile = () => {
                 creator_id
               )
             `)
-            .eq('user_id', userData.id),
+            .eq('user_id', userDataWithCounts.id),
 
           // Check if the current user follows this profile
-          user && userData.id !== user.id ? 
+          user && userDataWithCounts.id !== user.id ? 
             supabase
               .from('user_follows')
               .select('*')
               .eq('follower_id', user.id)
-              .eq('following_id', userData.id)
+              .eq('following_id', userDataWithCounts.id)
               .maybeSingle() : 
             Promise.resolve({ data: null })
         ]);
@@ -1214,7 +1229,15 @@ const Profile = () => {
     // If there's an error or map is still loading, return a gradient background instead
     if (mapError || mapLoading) {
       return (
-        <div className="h-full w-full bg-gradient-to-r from-hireyth-light to-hireyth-main rounded-t-xl overflow-hidden"></div>
+        <div className="h-full w-full bg-gradient-to-r from-hireyth-light to-hireyth-main rounded-t-xl overflow-hidden relative">
+          {mapLoading && (
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-white/20 rounded-full p-2 backdrop-blur-sm">
+                <Loader2 className="h-5 w-5 text-white animate-spin" />
+              </div>
+            </div>
+          )}
+        </div>
       );
     }
     
@@ -1227,15 +1250,7 @@ const Profile = () => {
   };
 
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50 pb-20">
-        <BottomNav />
-        <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
-          <Loader2 className="h-12 w-12 text-hireyth-main animate-spin mb-4" />
-          <p className="text-gray-600 text-lg">Loading profile...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
   if (error) {
@@ -1321,10 +1336,19 @@ const Profile = () => {
                 placeholder="Your name"
               />
             ) : (
-              <h1 className="text-2xl font-bold mb-1 gradient-text">{profileData?.name}</h1>
+              <h1 className="text-2xl font-bold mb-1 gradient-text flex items-center justify-center">
+                {profileData?.name}
+                {profileData?.is_verified && (
+                  <span className="ml-2 bg-purple-600 w-5 h-5 rounded-full flex items-center justify-center">
+                    <span className="text-white text-xs">✓</span>
+                  </span>
+                )}
+              </h1>
             )}
             
-            <p className="text-gray-500 mb-3">@{profileData?.username}</p>
+            <div className="flex items-center justify-center mb-3">
+              <p className="text-gray-500">@{profileData?.username}</p>
+            </div>
             
             <div className="flex justify-center space-x-3 text-sm text-gray-500 mb-4">
               {isEditMode ? (

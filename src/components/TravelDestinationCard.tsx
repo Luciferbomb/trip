@@ -4,6 +4,7 @@ import { MapPin, Calendar, ArrowRight, User } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Link } from "react-router-dom"
+import VerificationBadge from '@/components/VerificationBadge'
 
 interface TravelDestinationCardProps {
   imageSrc: string
@@ -15,6 +16,7 @@ interface TravelDestinationCardProps {
   creatorImage?: string
   creatorId?: string
   creatorUsername?: string
+  creatorIsVerified?: boolean
   itemType?: 'trip' | 'experience'
   className?: string
   onClick?: () => void
@@ -30,6 +32,7 @@ export function TravelDestinationCard({
   creatorImage,
   creatorId,
   creatorUsername,
+  creatorIsVerified,
   itemType = 'trip',
   className,
   onClick,
@@ -71,6 +74,7 @@ export function TravelDestinationCard({
               to={`/profile/${creatorUsername}`}
               onClick={(e) => e.stopPropagation()}
               className="flex items-center gap-1.5 text-xs text-gray-600 hover:text-blue-600"
+              aria-label={`View ${creatorName}'s profile`}
             >
               <Avatar className="h-5 w-5 border border-gray-200">
                 <AvatarImage src={creatorImage} />
@@ -79,6 +83,11 @@ export function TravelDestinationCard({
                 </AvatarFallback>
               </Avatar>
               <span>{creatorName}</span>
+              {creatorIsVerified && (
+                <span className="ml-0.5 flex-shrink-0">
+                  <VerificationBadge size="sm" withTooltip={false} />
+                </span>
+              )}
             </Link>
           )}
           {/* Anonymous creator fallback */}

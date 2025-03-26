@@ -8,6 +8,14 @@ import { Link } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import { updateParticipantStatus, checkTripAvailability } from '@/lib/dbFunctions';
 
+interface UserInfo {
+  name?: string;
+  profile_image?: string;
+  username?: string;
+  email?: string;
+  id?: string;
+}
+
 interface Participant {
   id: string;
   user_id: string;
@@ -121,30 +129,79 @@ const TripParticipants = ({
       if (!isMounted.current) return;
       
       setLoading(true);
+      // First check if trip exists and get current spots
+      const { data: tripData, error: tripError } = await supabase
+        .from('trips')
+        .select('spots, spots_filled')
+        .eq('id', tripId)
+        .single();
+        
+      if (tripError) {
+        console.error('Error fetching trip data:', tripError);
+        toast({
+          title: 'Error',
+          description: 'Could not verify trip data',
+          variant: 'destructive'
+        });
+      } else if (tripData) {
+        // Update spots available from the latest data
+        setSpotsAvailable(tripData.spots - (tripData.spots_filled || 0));
+      }
+      
+      // Now fetch participants with detailed information
       const { data, error } = await supabase
         .from('trip_participants')
         .select(`
           id,
           user_id,
           status,
+          created_at,
           user:users (
+            id,
             name,
             profile_image,
-            username
+            username,
+            email
           )
         `)
         .eq('trip_id', tripId)
-        .order('created_at', { ascending: true })
-        .returns<Participant[]>();
+        .order('created_at', { ascending: true });
 
       if (error) throw error;
       
-      if (isMounted.current) {
-        setParticipants(data || []);
+      if (!data) {
+        setParticipants([]);
+        return;
+      }
+      
+      // Transform the data to match the Participant interface
+      const transformedParticipants = data.map((p): Participant => {
+        // Safely access nested user properties with type assertion
+        const userData = (p.user || {}) as UserInfo;
         
-        // Calculate available spots
-        const approvedCount = (data || []).filter(p => p.status === 'approved').length;
+        return {
+          id: p.id,
+          user_id: p.user_id,
+          status: p.status,
+          user: {
+            name: userData.name || 'Unknown User',
+            profile_image: userData.profile_image || '',
+            username: userData.username || 'unknown'
+          }
+        };
+      });
+      
+      if (isMounted.current) {
+        setParticipants(transformedParticipants);
+        
+        // Calculate available spots again from the participants data
+        const approvedCount = transformedParticipants.filter(p => p.status === 'approved').length;
         setSpotsAvailable(spots - approvedCount);
+        
+        // Call the update callback if provided
+        if (onParticipantUpdate) {
+          onParticipantUpdate();
+        }
       }
     } catch (error) {
       console.error('Error fetching participants:', error);
@@ -169,6 +226,20 @@ const TripParticipants = ({
   };
 
   const handleUpdateStatus = (participantId: string, newStatus: string) => {
+    // Validate before approving
+    if (newStatus === 'approve') {
+      // Check if there are spots available
+      if (spotsAvailable <= 0) {
+        toast({
+          title: "No Spots Available",
+          description: "This trip is already full. Cannot approve more participants.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+    
+    // Call the parent action handler
     onAction(participantId, newStatus as 'approve' | 'reject' | 'remove');
   };
 

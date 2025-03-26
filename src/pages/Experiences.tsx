@@ -14,7 +14,7 @@ import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
 import { Badge } from '@/components/ui/badge';
 import EnhancedExperienceCard from '@/components/EnhancedExperienceCard';
-import AppHeader from '@/components/AppHeader';
+import { Header } from '../components/Header';
 import BottomNav from '@/components/BottomNav';
 
 interface ExperienceUser {

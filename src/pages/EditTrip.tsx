@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { useAuth } from '@/lib/auth-context';
 import { supabase } from '@/lib/supabase';
-import AppHeader from '@/components/AppHeader';
+import { Header } from '../components/Header';
 import { format } from 'date-fns';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Calendar as CalendarComponent } from '@/components/ui/calendar';
@@ -151,7 +151,7 @@ const EditTrip = () => {
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <AppHeader />
+        <Header />
         <div className="flex items-center justify-center h-[calc(100vh-64px)]">
           <Loader2 className="w-8 h-8 animate-spin" />
         </div>
@@ -162,7 +162,7 @@ const EditTrip = () => {
   if (error) {
     return (
       <div className="min-h-screen bg-gray-50">
-        <AppHeader />
+        <Header />
         <div className="max-w-2xl mx-auto p-4">
           <div className="text-center">
             <h1 className="text-2xl font-bold text-red-600">Error</h1>
@@ -178,7 +178,7 @@ const EditTrip = () => {
   
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
-      <AppHeader />
+      <Header />
       
       <div className="bg-white p-4 flex items-center border-b">
         <Button 

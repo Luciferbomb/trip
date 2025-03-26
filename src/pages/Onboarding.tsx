@@ -9,7 +9,7 @@ import { RadioGroup, RadioGroupItem } from '../components/ui/radio-group';
 import { useToast } from '../components/ui/use-toast';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
-import AppHeader from '../components/AppHeader';
+import { Header } from '../components/Header';
 
 const Onboarding = () => {
   const { user } = useAuth();
@@ -738,7 +738,7 @@ const Onboarding = () => {
         <div className="absolute bottom-1/3 left-1/3 w-60 h-60 bg-blue-400 rounded-full opacity-10 filter blur-3xl animate-pulse" style={{ animationDelay: '2s' }}></div>
       </div>
       
-      <AppHeader />
+      <Header />
       
       <div className="relative z-10 max-w-md mx-auto p-4 pt-20">
         <div className="glassmorphism-card p-6 rounded-xl border border-white/20">

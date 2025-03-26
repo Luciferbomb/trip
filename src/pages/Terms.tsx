@@ -1,16 +1,15 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import { Button } from '../components/ui/button';
+import { Header } from '../components/Header';
 import { useNavigate } from 'react-router-dom';
-import AppHeader from '../components/AppHeader';
 
 const Terms = () => {
   const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <AppHeader />
+      <Header />
       
       {/* Sub Header */}
       <div className="bg-white p-4 flex items-center border-b">

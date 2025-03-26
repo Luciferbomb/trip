@@ -21,7 +21,7 @@ import {
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { v4 as uuidv4 } from 'uuid';
-import AppHeader from '@/components/AppHeader';
+import { Header } from '../components/Header';
 import { supabase } from '@/lib/supabase';
 import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
 import { useAuth } from '@/lib/auth-context';

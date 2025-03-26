@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import { MainLayout } from '@/layouts/MainLayout';
-import ChatDatabaseTest from '@/components/ChatDatabaseTest';
 import { runMigrations } from '@/lib/migrations';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/components/ui/use-toast';
@@ -384,9 +383,6 @@ export default function DebugPage() {
               </div>
             </CardContent>
           </Card>
-          
-          {/* Database Test Card */}
-          <ChatDatabaseTest />
           
           {/* Approval System Card */}
           <Card>

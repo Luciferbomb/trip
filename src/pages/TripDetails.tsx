@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { format } from 'date-fns';
-import AppHeader from '@/components/AppHeader';
+import { Header } from '../components/Header';
 import BottomNav from '@/components/BottomNav';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
@@ -33,6 +33,9 @@ import { getUserTripStatus, updateParticipantStatus, checkTripAvailability } fro
 import TripParticipants from '@/components/TripParticipants';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { runChatTest } from '@/lib/chat-db-test';
+import Chat from '@/components/Chat';
+import { AlertCircle } from 'lucide-react';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 
 interface Participant {
   id: string;
@@ -82,6 +85,7 @@ const TripDetails = () => {
   const [followLoading, setFollowLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [canJoin, setCanJoin] = useState<boolean>(false);
+  const [isApproved, setIsApproved] = useState(false);
   
   // Function to fetch trip details
     const fetchTripDetails = async () => {
@@ -174,6 +178,7 @@ const TripDetails = () => {
       if (user) {
         const status = await getUserTripStatus(user.id, id);
         console.log('User trip status:', status);
+        setIsApproved(status === 'approved');
       }
       
       setError(null);
@@ -673,16 +678,28 @@ const TripDetails = () => {
               <MessageCircle className="h-5 w-5 text-gray-600" />
               Discussion Forum
             </h3>
-            <TripDiscussion 
-              tripId={id || ''} 
-              isCreator={!!user && !!trip && user.id === trip.creator_id} 
-              isApproved={
-                !!user && (
-                  (!!trip && user.id === trip.creator_id) || 
-                  userParticipation?.status === 'approved'
-                )
-              }
-            />
+            
+            {!user ? (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Authentication Required</AlertTitle>
+                <AlertDescription>
+                  You need to be logged in to view the discussion.
+                </AlertDescription>
+              </Alert>
+            ) : !isApproved && !(!!trip && user.id === trip.creator_id) ? (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertTitle>Pending Approval</AlertTitle>
+                <AlertDescription>
+                  You can participate in the discussion once your request to join is approved.
+                </AlertDescription>
+              </Alert>
+            ) : (
+              <div className="bg-white rounded-lg border overflow-hidden">
+                <Chat tripId={id || ''} tripName={trip?.title} />
+              </div>
+            )}
           </div>
 
           {/* Add near the trip action buttons (after Delete Trip button and before TripDiscussion component) */}
