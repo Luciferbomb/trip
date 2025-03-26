@@ -244,8 +244,6 @@ const Profile = () => {
       const queryParam = username ? 'username' : 'id';
       const queryValue = username || user?.id;
       
-      console.log(`Fetching profile data for ${queryParam}=${queryValue}`);
-      
       // Use a single query to fetch user data with all related counts
       const { data: userData, error: userError } = await supabase
         .from('users')
@@ -258,7 +256,6 @@ const Profile = () => {
         .single();
           
       if (userError) {
-        console.error('Error fetching user:', userError);
         if (userError.code === 'PGRST116') {
           setError('Profile not found');
           toast({
@@ -296,9 +293,6 @@ const Profile = () => {
       };
       
       setProfileData(userDataWithCounts);
-      console.log('Profile data loaded:', userDataWithCounts);
-      console.log('Verification status:', userDataWithCounts.is_verified);
-      console.log('Verification reason:', userDataWithCounts.verification_reason);
 
       // Fetch all related data in parallel for better performance
       try {
@@ -382,13 +376,11 @@ const Profile = () => {
         setIsFollowing(!!followStatusResult.data);
         
       } catch (fetchError: any) {
-        console.error('Error fetching related data:', fetchError);
         // Don't show an error toast here since we already have the basic profile data
         // Just log it to console
       }
 
     } catch (error: any) {
-      console.error('Error fetching profile data:', error);
       setError(error.message || 'Failed to load profile');
       toast({
         title: 'Error',
@@ -437,7 +429,6 @@ const Profile = () => {
       });
       
     } catch (error: any) {
-      console.error('Error updating profile:', error);
       toast({
         title: 'Error',
         description: 'Failed to update profile. Please try again.',
@@ -489,7 +480,6 @@ const Profile = () => {
         } : null);
       }
     } catch (error) {
-      console.error('Error following/unfollowing:', error);
       toast({
         title: 'Error',
         description: 'Failed to update follow status',
@@ -544,10 +534,12 @@ const Profile = () => {
           }));
         }
       } catch (userErr) {
-        console.error('Error updating profile data:', userErr);
+        toast({
+          title: 'Notice',
+          description: 'Unable to update experience count',
+        });
       }
     } catch (error) {
-      console.error('Error refreshing experiences:', error);
       toast({
         title: 'Error',
         description: 'Failed to refresh experiences',
@@ -587,7 +579,6 @@ const Profile = () => {
       setFollowers(followers);
       
     } catch (error) {
-      console.error('Error fetching followers:', error);
       toast({
         title: 'Error',
         description: 'Failed to load followers',
@@ -629,7 +620,6 @@ const Profile = () => {
       setFollowing(following);
       
     } catch (error) {
-      console.error('Error fetching following:', error);
       toast({
         title: 'Error',
         description: 'Failed to load following users',
@@ -665,7 +655,6 @@ const Profile = () => {
       });
       
     } catch (error) {
-      console.error('Error removing follower:', error);
       toast({
         title: 'Error',
         description: 'Failed to remove follower',
@@ -699,7 +688,6 @@ const Profile = () => {
       });
       
     } catch (error) {
-      console.error('Error unfollowing user:', error);
       toast({
         title: 'Error',
         description: 'Failed to unfollow user',
@@ -729,7 +717,6 @@ const Profile = () => {
       });
       
     } catch (error) {
-      console.error('Error deleting experience:', error);
       toast({
         title: 'Error',
         description: 'Failed to delete experience',
@@ -781,7 +768,6 @@ const Profile = () => {
         );
       }
     } catch (error) {
-      console.error('Error liking/unliking experience:', error);
       toast({
         title: 'Error',
         description: 'Failed to update like status',
@@ -823,7 +809,6 @@ const Profile = () => {
       });
       
     } catch (error: any) {
-      console.error('Error deleting trip:', error);
       toast({
         title: 'Error',
         description: error.message || 'Failed to delete trip',
@@ -981,7 +966,6 @@ const Profile = () => {
       await supabase.auth.signOut();
       navigate('/login');
     } catch (error) {
-      console.error('Error logging out:', error);
       toast({
         title: 'Error',
         description: 'Failed to log out',
@@ -1108,7 +1092,6 @@ const Profile = () => {
           
           setLocations(coords);
         } catch (error) {
-          console.error('Error fetching user locations:', error);
           // Set some default locations
           setLocations([
             [-74.0060, 40.7128], // New York
@@ -1175,8 +1158,7 @@ const Profile = () => {
             try {
               new mapboxgl.Marker(el).setLngLat(loc).addTo(map.current!);
             } catch (err) {
-              console.error('Failed to add marker:', err);
-              // Continue with other markers
+              // Silently ignore marker errors
             }
           });
           
@@ -1197,7 +1179,6 @@ const Profile = () => {
               // Request next frame
               animationFrameId = requestAnimationFrame(rotateCamera);
             } catch (err) {
-              console.error('Error in rotation animation:', err);
               cancelAnimationFrame(animationFrameId);
               setMapError(true);
             }
@@ -1209,11 +1190,9 @@ const Profile = () => {
         
         // Handle map errors
         map.current.on('error', (e) => {
-          console.error('Mapbox error:', e);
           setMapError(true);
         });
       } catch (err) {
-        console.error('Error initializing map:', err);
         setMapError(true);
       }
       
@@ -1547,7 +1526,7 @@ const Profile = () => {
               }`}
               onClick={() => setActiveTab('experiences')}
             >
-              <Grid className={`w-4 h-4 mr-2 ${activeTab === 'experiences' ? 'text-blue-500' : ''}`} />
+              <Camera className={`w-4 h-4 mr-2 ${activeTab === 'experiences' ? 'text-blue-500' : ''}`} />
               <span>Experiences</span>
                 </button>
                 <button
@@ -1617,7 +1596,7 @@ const Profile = () => {
                               />
                             ) : (
                               <div className="w-full h-56 bg-gray-100 flex items-center justify-center">
-                                <ImageIcon className="h-12 w-12 text-gray-300" />
+                                <Camera className="h-12 w-12 text-gray-300" />
                           </div>
                             )}
                             
