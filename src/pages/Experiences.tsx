@@ -4,18 +4,23 @@ import ExperienceCard from '@/components/ExperienceCard';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Search, MapPin, Loader2, LogOut } from 'lucide-react';
+import { Search, MapPin, Loader2, LogOut, Plus } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth-context';
 import { Skeleton } from '@/components/ui/skeleton';
 import AddExperienceDialog from '@/components/AddExperienceDialog';
 import MapboxGlobe from '@/components/GlobeVisualization';
-import { toast } from '@/components/ui/use-toast';
+import { useToast } from '@/components/ui/use-toast';
 import { useNavigate } from 'react-router-dom';
+import { Badge } from '@/components/ui/badge';
+import EnhancedExperienceCard from '@/components/EnhancedExperienceCard';
+import AppHeader from '@/components/AppHeader';
+import BottomNav from '@/components/BottomNav';
 
 interface ExperienceUser {
   name: string;
   profile_image: string;
+  username?: string;
 }
 
 interface Experience {
@@ -33,6 +38,7 @@ interface Experience {
 const Experiences = () => {
   const { user, signOut } = useAuth();
   const navigate = useNavigate();
+  const { toast } = useToast();
   const [experiences, setExperiences] = useState<Experience[]>([]);
   const [filteredExperiences, setFilteredExperiences] = useState<Experience[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -272,6 +278,23 @@ const Experiences = () => {
     }
   };
 
+  const handleDeleteExperience = async (id: string) => {
+    try {
+      await supabase
+        .from('experiences')
+        .delete()
+        .eq('id', id);
+      fetchExperiences(1);
+    } catch (error) {
+      console.error('Error deleting experience:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete experience. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
   const renderExperienceCards = () => {
     if (isLoading) {
       return Array(6).fill(0).map((_, index) => (
@@ -315,31 +338,39 @@ const Experiences = () => {
       
       return (
         <div className="col-span-full flex flex-col items-center justify-center py-20 text-center">
-          <div className="rounded-full bg-gray-100 p-4 mb-4">
-            <MapPin className="h-8 w-8 text-gray-400" />
+          <div className="rounded-full bg-blue-100 p-6 mb-4">
+            <MapPin className="h-10 w-10 text-blue-600" />
           </div>
-          <h3 className="text-lg font-medium text-gray-900 mb-1">No experiences found</h3>
-          <p className="text-gray-500 mb-4 max-w-md">
-            Be the first to share an experience!
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">No experiences yet</h3>
+          <p className="text-gray-600 mb-6 max-w-md">
+            Share your travel adventures and inspire others. Be the first to add an experience!
           </p>
-          <Button onClick={handleAddExperience} variant="primary">
-            Get Started
+          <Button onClick={handleAddExperience} variant="default" size="lg" className="bg-blue-600 hover:bg-blue-700 text-white">
+            <Plus className="h-5 w-5 mr-2" />
+            Create Your First Experience
           </Button>
         </div>
       );
     }
 
     return filteredExperiences.map(exp => (
-      <ExperienceCard 
+      <EnhancedExperienceCard 
         key={exp.id}
         id={exp.id}
-        images={exp.image_url ? [exp.image_url] : []}
-        caption={exp.description || exp.title}
+        title={exp.title}
+        description={exp.description}
         location={exp.location}
-        date={exp.created_at}
-        userName={exp.users?.name || 'Anonymous'}
-        userImage={exp.users?.profile_image}
-        experienceType={exp.categories?.[0] || "Travel"}
+        image_url={exp.image_url}
+        created_at={exp.created_at}
+        user={{
+          id: exp.user_id,
+          name: exp.users?.name || 'Unknown User',
+          username: exp.users?.username || 'unknown',
+          profile_image: exp.users?.profile_image || ''
+        }}
+        categories={exp.categories || []}
+        isOwnProfile={exp.user_id === user?.id}
+        onDelete={handleDeleteExperience}
       />
     ));
   };
@@ -355,6 +386,7 @@ const Experiences = () => {
               onClick={handleAddExperience} 
               variant="primary"
               size="lg"
+              className="bg-blue-600 hover:bg-blue-700 text-white"
             >
               <MapPin className="mr-2 h-4 w-4" />
               Share Experience
@@ -483,14 +515,23 @@ const Experiences = () => {
       {/* Add experience dialog */}
       {user && (
         <AddExperienceDialog
-          open={showAddExperience}
-          onOpenChange={setShowAddExperience}
+          isOpen={showAddExperience}
+          onClose={() => setShowAddExperience(false)}
           onExperienceAdded={handleExperienceAdded}
-          userId={user.id}
         />
       )}
+      
+      {/* Floating action button for adding experience */}
+      <div className="fixed bottom-20 right-4 z-30">
+        <Button
+          onClick={handleAddExperience}
+          className="h-14 w-14 rounded-full bg-blue-600 hover:bg-blue-700 text-white shadow-lg"
+        >
+          <Plus className="h-6 w-6" />
+        </Button>
+      </div>
     </ExperiencesLayout>
   );
 };
 
-export default Experiences; 
+export default Experiences;

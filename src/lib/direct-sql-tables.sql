@@ -69,6 +69,7 @@ CREATE TABLE trip_participants (
     user_id UUID REFERENCES users(id) ON DELETE CASCADE,
     status TEXT DEFAULT 'pending',
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     UNIQUE(trip_id, user_id)
 );
 
@@ -159,6 +160,13 @@ CREATE TRIGGER update_users_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+-- Create trigger for trip_participants table timestamps
+DROP TRIGGER IF EXISTS update_trip_participants_updated_at ON trip_participants;
+CREATE TRIGGER update_trip_participants_updated_at
+    BEFORE UPDATE ON trip_participants
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- Enable Row Level Security
 ALTER TABLE users ENABLE ROW LEVEL SECURITY;
 ALTER TABLE trips ENABLE ROW LEVEL SECURITY;
@@ -190,20 +198,21 @@ DROP POLICY IF EXISTS "Users can follow/unfollow" ON user_follows;
 DROP POLICY IF EXISTS "Users can delete own follows" ON user_follows;
 
 -- Create policies for users table
-CREATE POLICY "Users can view all profiles"
+CREATE POLICY "Public read access"
     ON users FOR SELECT
-    TO authenticated
+    TO public
     USING (true);
 
-CREATE POLICY "Anyone can insert during signup"
+CREATE POLICY "Enable insert for authentication"
     ON users FOR INSERT
-    TO anon, authenticated
+    TO public
     WITH CHECK (true);
 
-CREATE POLICY "Users can update own profile"
+CREATE POLICY "Enable update for users based on id"
     ON users FOR UPDATE
-    TO authenticated
-    USING (auth.uid()::text = id::text);
+    TO public
+    USING (auth.uid()::text = id::text)
+    WITH CHECK (auth.uid()::text = id::text);
 
 -- Create policies for trips table
 CREATE POLICY "Anyone can view trips"

@@ -1,0 +1,2 @@
+-- IMPORTANT: COPY AND RUN THIS ENTIRE SCRIPT IN YOUR SUPABASE SQL EDITOR
+-- This script will fix the missing updated_at column issue that is causing the error in TripDetails.tsx

@@ -29,6 +29,71 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Function to check database connection and chat tables
+export const checkSupabaseConnection = async (): Promise<{
+  connected: boolean;
+  chatTables: {
+    trip_chats: boolean;
+    trip_messages: boolean;
+  };
+  error?: string;
+}> => {
+  try {
+    // Test connection with a simple query
+    const { error: connectionError } = await supabase
+      .from('users')
+      .select('count', { count: 'exact', head: true });
+      
+    if (connectionError) {
+      console.error('Supabase connection check failed:', connectionError);
+      return { 
+        connected: false,
+        chatTables: { trip_chats: false, trip_messages: false },
+        error: connectionError.message
+      };
+    }
+    
+    // Check if trip_chats table exists
+    const { error: chatTableError } = await supabase
+      .from('trip_chats')
+      .select('id')
+      .limit(1);
+      
+    const tripChatsExists = !chatTableError || !chatTableError.message.includes('does not exist');
+    
+    // Check if trip_messages table exists
+    const { error: messagesTableError } = await supabase
+      .from('trip_messages')
+      .select('id')
+      .limit(1);
+      
+    const tripMessagesExists = !messagesTableError || !messagesTableError.message.includes('does not exist');
+    
+    console.log('Database connection and table check:', { 
+      connected: true,
+      trip_chats: tripChatsExists,
+      trip_messages: tripMessagesExists,
+      chat_error: chatTableError?.message,
+      messages_error: messagesTableError?.message
+    });
+    
+    return {
+      connected: true,
+      chatTables: {
+        trip_chats: tripChatsExists,
+        trip_messages: tripMessagesExists
+      }
+    };
+  } catch (error: any) {
+    console.error('Unexpected error checking Supabase connection:', error);
+    return {
+      connected: false,
+      chatTables: { trip_chats: false, trip_messages: false },
+      error: error?.message || 'Unknown error'
+    };
+  }
+};
+
 // Configure email confirmation URL
 export const getEmailRedirectUrl = () => {
   // Use the deployed site URL if available, fallback to current origin
@@ -83,5 +148,82 @@ supabase.auth.onAuthStateChange((event, session) => {
     console.log('User signed out');
   }
 });
+
+// Function to check approval system tables
+export const checkApprovalTables = async (): Promise<{
+  connected: boolean;
+  approvalTables: {
+    trips: boolean;
+    trip_participants: boolean;
+    users: boolean;
+  };
+  error?: string;
+}> => {
+  try {
+    // Test connection with a simple query
+    const { error: connectionError } = await supabase
+      .from('users')
+      .select('count', { count: 'exact', head: true });
+      
+    if (connectionError) {
+      console.error('Supabase connection check failed:', connectionError);
+      return { 
+        connected: false,
+        approvalTables: { trips: false, trip_participants: false, users: false },
+        error: connectionError.message
+      };
+    }
+    
+    // Check if trips table exists
+    const { error: tripsError } = await supabase
+      .from('trips')
+      .select('id')
+      .limit(1);
+      
+    const tripsExists = !tripsError || !tripsError.message.includes('does not exist');
+    
+    // Check if trip_participants table exists
+    const { error: participantsError } = await supabase
+      .from('trip_participants')
+      .select('id')
+      .limit(1);
+      
+    const participantsExists = !participantsError || !participantsError.message.includes('does not exist');
+    
+    // Check if users table exists
+    const { error: usersError } = await supabase
+      .from('users')
+      .select('id')
+      .limit(1);
+      
+    const usersExists = !usersError || !usersError.message.includes('does not exist');
+    
+    console.log('Approval tables check:', { 
+      connected: true,
+      trips: tripsExists,
+      trip_participants: participantsExists,
+      users: usersExists,
+      trips_error: tripsError?.message,
+      participants_error: participantsError?.message,
+      users_error: usersError?.message
+    });
+    
+    return {
+      connected: true,
+      approvalTables: {
+        trips: tripsExists,
+        trip_participants: participantsExists,
+        users: usersExists
+      }
+    };
+  } catch (error: any) {
+    console.error('Unexpected error checking approval tables:', error);
+    return {
+      connected: false,
+      approvalTables: { trips: false, trip_participants: false, users: false },
+      error: error?.message || 'Unknown error'
+    };
+  }
+};
 
 export default supabase; 

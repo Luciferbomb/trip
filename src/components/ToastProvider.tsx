@@ -58,12 +58,14 @@ const Toast = ({ toast, onDismiss }: { toast: ToastProps; onDismiss: () => void 
 const ToastProvider = ({ children }: { children: React.ReactNode }) => {
   const [toasts, setToasts] = useState<ToastProps[]>([]);
 
-  const addToast = useCallback((message: string, type: ToastType = 'info') => {
+  // Add a toast and return its ID
+  const addToast = useCallback((message: string, type: ToastType = 'info'): string => {
     const id = Date.now().toString();
     setToasts((prev) => [...prev, { id, message, type }]);
     return id;
   }, []);
 
+  // Dismiss toast by ID
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((toast) => toast.id !== id));
   }, []);

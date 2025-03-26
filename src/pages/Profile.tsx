@@ -74,6 +74,7 @@ interface DatabaseTripParticipation {
     spots: number;
     creator_name: string;
     creator_image: string;
+    creator_id: string;
   };
 }
 
@@ -147,6 +148,9 @@ const Profile = () => {
   const [loadingFollowers, setLoadingFollowers] = useState(false);
   const [loadingFollowing, setLoadingFollowing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  
+  // Add a computed property for checking if this is the user's own profile
+  const isOwnProfile = user !== null && profileData !== null && user.id === profileData.id;
 
   useEffect(() => {
     if (user) {
@@ -210,287 +214,96 @@ const Profile = () => {
   const fetchProfileData = async () => {
     try {
       setLoading(true);
-      setError(null); // Reset error state
+      setError(null);
       
-      let userData;
-      
-      if (!username && user) {
-        // If no username in URL, fetch current user's profile by ID
-        const { data, error } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) throw error;
-        if (!data) {
-          setError('Could not find your profile.');
+      if (!username && !user?.id) {
+        setError('User not logged in or username not provided');
           toast({
             title: 'Error',
-            description: 'Could not find your profile.',
+          description: 'Please log in to view profiles',
             variant: 'destructive'
           });
           return;
         }
         
-        // If not onboarded, redirect to onboarding
-        if (!data.onboarding_completed) {
-          navigate('/onboarding');
-          return;
-        }
-        
-        // If no username, redirect to onboarding to complete profile
-        if (!data.username) {
-          toast({
-            title: 'Complete your profile',
-            description: 'Please complete your profile setup with a username',
-            variant: 'destructive'
-          });
-          navigate('/onboarding');
-          return;
-        }
-        
-        userData = data;
-      } else if (username) {
-        // Fetch profile by username
-        const { data, error } = await supabase
+      // Determine query parameter (username or id)
+      const queryParam = username ? 'username' : 'id';
+      const queryValue = username || user?.id;
+      
+      console.log(`Fetching profile data for ${queryParam}=${queryValue}`);
+      
+      // Use a single query to fetch user data with all related counts
+      const { data: userResult, error: userError } = await supabase
           .from('users')
-          .select('*')
-          .eq('username', username)
+        .select(`
+          *,
+          followers_count,
+          following_count,
+          experiences_count
+        `)
+        .eq(queryParam, queryValue)
           .single();
           
-        if (error) throw error;
-        if (!data) {
+      if (userError) {
+        console.error('Error fetching user:', userError);
+        if (userError.code === 'PGRST116') {
           setError('Profile not found');
-          navigate('/404');
+          toast({
+            title: 'Not Found',
+            description: 'The requested profile could not be found.',
+            variant: 'destructive'
+          });
+        } else {
+          setError(userError.message);
+          toast({
+            title: 'Error',
+            description: 'Failed to load profile data. Try refreshing the page.',
+            variant: 'destructive'
+          });
+        }
           return;
         }
         
-        // Check if user has completed onboarding and has a username
-        if (!data.onboarding_completed || !data.username) {
-          setError('This user has not completed their profile setup');
-          navigate('/404');
-          return;
-        }
-        
-        // If viewing own profile, redirect to /profile
-        if (user && data.id === user.id) {
-          navigate('/profile');
-          return;
-        }
-        
-        userData = data;
-      } else {
-        // No username and no user - should not happen
-        setError('You must be logged in to view profiles');
-        navigate('/login');
+      if (!userResult) {
+        setError('Could not find profile.');
+        toast({
+          title: 'Error',
+          description: 'Could not find profile.',
+          variant: 'destructive'
+        });
         return;
       }
       
-      // Ensure followers_count and following_count are initialized
-      userData = {
-        ...userData,
-        followers_count: userData.followers_count || 0,
-        following_count: userData.following_count || 0
+      // Initialize counts to zero if they're null
+      const userData = {
+        ...userResult,
+        followers_count: userResult.followers_count || 0,
+        following_count: userResult.following_count || 0,
+        experiences_count: userResult.experiences_count || 0
       };
       
       setProfileData(userData);
-      
-      // Check if current user is following this profile
-      if (user && userData && user.id !== userData.id) {
-        try {
-        const { data: followData } = await supabase
-          .from('user_follows')
-          .select('*')
-          .eq('follower_id', user.id)
-          .eq('following_id', userData.id)
-          .single();
-          
-        setIsFollowing(!!followData);
-        } catch (followError) {
-          console.error('Error checking follow status:', followError);
-          // Failing to check follow status is not critical, continue
-        }
-      }
-      
-      // Fetch experiences
+      console.log('Profile data loaded:', userData);
+
+      // Fetch all related data in parallel for better performance
       try {
-        // First fetch basic experience data without nested counts
-      const { data: experienceData, error: expError } = await supabase
+        const [experiencesResult, createdTripsResult, participationsResult, followStatusResult] = await Promise.all([
+          // Get experiences
+          supabase
         .from('experiences')
         .select('*')
         .eq('user_id', userData.id)
-        .order('created_at', { ascending: false });
-        
-        if (expError) {
-          if (expError.code === '42P01') {
-            // Table does not exist error, try to run migrations
-            console.error('Experiences table does not exist:', expError);
-            // Set empty experiences array to avoid breaking the UI
-            setExperiences([]);
-            setError('Database setup needed. Please wait while we set up your profile or click "Run Setup" below.');
-            
-            // Try to run migrations to create the table
-            try {
-              const { createExperiencesTable, createExperienceLikesTable, createExperienceCommentsTable } = await import('@/lib/migrations');
-              
-              // Run the functions in sequence
-              const experiencesCreated = await createExperiencesTable();
-              if (experiencesCreated) {
-                console.log('Experiences table created successfully');
-                
-                // Now try to create the dependent tables
-                await createExperienceLikesTable();
-                await createExperienceCommentsTable();
-                
-                // Show success message
-                toast({
-                  title: 'Setup completed',
-                  description: 'Your profile is now ready. Please refresh the page.',
-                  duration: 5000,
-                });
-              } else {
-                // Show error message
-                toast({
-                  title: 'Setup failed',
-                  description: 'Could not set up your profile. Please try again later.',
-                  variant: 'destructive',
-                  duration: 5000,
-                });
-              }
-            } catch (migrationError) {
-              console.error('Failed to run migrations:', migrationError);
-              setError('Failed to set up your profile. Please try again later.');
-            }
-          } else {
-            console.error('Error fetching experiences:', expError);
-            // Just set empty experiences instead of showing an error
-            setExperiences([]);
-            console.log('Setting experiences to empty array due to fetch error');
-          }
-        } else {
-          // Initialize experiences with zero counts
-          let processedExperiences = (experienceData || []).map(exp => ({
-            ...exp,
-            likes_count: 0,
-            comments_count: 0,
-            is_liked: false
-          }));
-          
-          // If we have experiences, fetch their likes and comments counts separately
-          if (processedExperiences.length > 0) {
-            const experienceIds = processedExperiences.map(exp => exp.id);
-            
-            // Fetch likes counts
-            try {
-              const { data: likesData, error: likesError } = await supabase
-                .from('experience_likes')
-                .select('experience_id')
-                .in('experience_id', experienceIds);
-                
-              if (!likesError && likesData) {
-                // Count likes per experience
-                const likesCountMap = new Map();
-                likesData.forEach(like => {
-                  const count = likesCountMap.get(like.experience_id) || 0;
-                  likesCountMap.set(like.experience_id, count + 1);
-                });
-                
-                // Update likes count
-                processedExperiences = processedExperiences.map(exp => ({
-                  ...exp,
-                  likes_count: likesCountMap.get(exp.id) || 0
-                }));
-              }
-            } catch (likesErr) {
-              console.error('Error fetching likes counts:', likesErr);
-            }
-            
-            // Fetch comments counts
-            try {
-              const { data: commentsData, error: commentsError } = await supabase
-                .from('experience_comments')
-                .select('experience_id')
-                .in('experience_id', experienceIds);
-                
-              if (!commentsError && commentsData) {
-                // Count comments per experience
-                const commentsCountMap = new Map();
-                commentsData.forEach(comment => {
-                  const count = commentsCountMap.get(comment.experience_id) || 0;
-                  commentsCountMap.set(comment.experience_id, count + 1);
-                });
-                
-                // Update comments count
-                processedExperiences = processedExperiences.map(exp => ({
-                  ...exp,
-                  comments_count: commentsCountMap.get(exp.id) || 0
-                }));
-              }
-            } catch (commentsErr) {
-              console.error('Error fetching comments counts:', commentsErr);
-            }
-            
-            // Check if user has liked any experiences
-            if (user) {
-              try {
-                const { data: userLikes, error: likesError } = await supabase
-                  .from('experience_likes')
-                  .select('experience_id')
-                  .eq('user_id', user.id)
-                  .in('experience_id', experienceIds);
-                  
-                if (!likesError && userLikes) {
-                  // Create a set of liked experience IDs for efficient lookup
-                  const likedExperienceIds = new Set(userLikes.map(like => like.experience_id));
-                  
-                  // Mark experiences as liked or not
-                  processedExperiences = processedExperiences.map(exp => ({
-                    ...exp,
-                    is_liked: likedExperienceIds.has(exp.id)
-                  }));
-                }
-              } catch (likesError) {
-                console.error('Error fetching user likes:', likesError);
-              }
-            }
-          }
-          
-          setExperiences(processedExperiences);
-        }
-      } catch (err) {
-        console.error('Unexpected error fetching experiences:', err);
-        setExperiences([]);
-        // Toast to inform the user
-        toast({
-          title: 'Error loading experiences',
-          description: 'There was an issue loading experiences. Please try refreshing the page.',
-          variant: 'destructive',
-        });
-      }
-      
-      // Fetch created trips
-      try {
-      const { data: createdTripsData, error: createdTripsError } = await supabase
+            .order('created_at', { ascending: false }),
+
+          // Get created trips
+          supabase
         .from('trips')
         .select('*')
         .eq('creator_id', userData.id)
-        .order('created_at', { ascending: false });
-      
-        if (createdTripsError) {
-          console.error('Error fetching created trips:', createdTripsError);
-          setCreatedTrips([]);
-        } else {
-      setCreatedTrips(createdTripsData || []);
-        }
-      } catch (tripsError) {
-        console.error('Error fetching created trips:', tripsError);
-        setCreatedTrips([]);
-      }
-      
-      // Fetch joined trips (including pending requests)
-      try {
-      const { data: participationsData, error: participationsError } = await supabase
+            .order('created_at', { ascending: false }),
+
+          // Get trips the user has joined
+          supabase
         .from('trip_participants')
         .select(`
           status,
@@ -503,35 +316,68 @@ const Profile = () => {
             end_date,
             spots,
             creator_name,
-            creator_image
-          )
-        `)
-        .eq('user_id', userData.id) as { data: DatabaseTripParticipation[] | null, error: any };
-      
-        if (participationsError) {
-          console.error('Error fetching joined trips:', participationsError);
-          setJoinedTrips([]);
-        } else {
-      const joinedTripsData = (participationsData || [])
-        .filter(p => p.trips)
+                creator_image,
+                creator_id
+              )
+            `)
+            .eq('user_id', userData.id),
+
+          // Check if the current user follows this profile
+          user && userData.id !== user.id ? 
+            supabase
+              .from('user_follows')
+              .select('*')
+              .eq('follower_id', user.id)
+              .eq('following_id', userData.id)
+              .maybeSingle() : 
+            Promise.resolve({ data: null })
+        ]);
+
+        // Handle experiences
+        if (experiencesResult.error) throw experiencesResult.error;
+        setExperiences(experiencesResult.data || []);
+
+        // Handle created trips
+        if (createdTripsResult.error) throw createdTripsResult.error;
+        setCreatedTrips(createdTripsResult.data || []);
+
+        // Handle joined trips
+        if (participationsResult.error) throw participationsResult.error;
+        const participationsData = participationsResult.data as unknown as DatabaseTripParticipation[];
+        
+        const joinedTripsData = participationsData
+          .filter(p => p.trips) // Ensure trips exist
         .map(p => ({
-          ...p.trips,
+            id: p.trips.id,
+            title: p.trips.title,
+            location: p.trips.location,
+            image_url: p.trips.image_url,
+            start_date: p.trips.start_date,
+            end_date: p.trips.end_date,
+            spots: p.trips.spots,
+            creator_name: p.trips.creator_name,
+            creator_image: p.trips.creator_image,
+            creator_id: p.trips.creator_id,
           status: p.status
         }));
       
       setJoinedTrips(joinedTripsData);
-        }
-      } catch (joinedTripsError) {
-        console.error('Error fetching joined trips:', joinedTripsError);
-        setJoinedTrips([]);
+
+        // Handle follow status
+        setIsFollowing(!!followStatusResult.data);
+        
+      } catch (fetchError: any) {
+        console.error('Error fetching related data:', fetchError);
+        // Don't show an error toast here since we already have the basic profile data
+        // Just log it to console
       }
-      
-    } catch (error) {
-      console.error('Error fetching profile:', error);
-      setError('Could not load profile data. Please try again.');
+
+    } catch (error: any) {
+      console.error('Error fetching profile data:', error);
+      setError(error.message || 'Failed to load profile');
       toast({
         title: 'Error',
-        description: 'Failed to load profile data.',
+        description: 'Failed to load profile data. Please try again later.',
         variant: 'destructive'
       });
     } finally {
@@ -670,16 +516,16 @@ const Profile = () => {
       
       // Update profile data with latest experience count
       try {
-        const { data: userData, error: userError } = await supabase
-          .from('users')
-          .select('experiences_count')
-          .eq('id', profileData.id)
-          .single();
-          
+      const { data: userData, error: userError } = await supabase
+        .from('users')
+        .select('experiences_count')
+        .eq('id', profileData.id)
+        .single();
+        
         if (!userError && userData) {
           setProfileData(prevData => ({
             ...prevData!,
-            experiences_count: userData.experiences_count
+        experiences_count: userData.experiences_count
           }));
         }
       } catch (userErr) {
@@ -979,9 +825,9 @@ const Profile = () => {
         <Link to={`/trips/${trip.id}`} className="block">
           <div className="modern-card bg-white overflow-hidden transition-all duration-300 hover:shadow-lg border border-gray-100">
             <div className="relative aspect-[16/9] overflow-hidden gradient-overlay">
-              <img
-                src={trip.image_url}
-                alt={trip.title}
+      <img
+        src={trip.image_url}
+        alt={trip.title}
                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
               
@@ -996,12 +842,12 @@ const Profile = () => {
               </div>
             </div>
             
-            <div className="p-4">
+      <div className="p-4">
               <h3 className="text-lg font-semibold text-gray-900 mb-1 group-hover:text-blue-600 transition-colors">{trip.title}</h3>
               <div className="flex items-center text-gray-600 mb-2">
                 <MapPin className="w-4 h-4 mr-1 text-blue-500" />
                 <span>{trip.location}</span>
-              </div>
+          </div>
               
               <div className="flex items-center text-gray-600">
                 <Calendar className="w-4 h-4 mr-1 text-blue-500" />
@@ -1010,15 +856,15 @@ const Profile = () => {
                 </span>
               </div>
               
-              {trip.status && (
+          {trip.status && (
                 <div className="mt-2">
                   <Badge variant={trip.status === 'approved' ? 'default' : 'secondary'} className="pill-badge">
-                    {trip.status}
-                  </Badge>
+              {trip.status}
+            </Badge>
                 </div>
-              )}
-            </div>
-          </div>
+          )}
+        </div>
+      </div>
         </Link>
         
         {isOwner && (
@@ -1033,8 +879,8 @@ const Profile = () => {
             </Button>
           </div>
         )}
-      </div>
-    );
+    </div>
+  );
   };
 
   // Update the followers dialog content
@@ -1380,105 +1226,64 @@ const Profile = () => {
     );
   };
 
-  // If there's an error
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 pb-20">
+        <BottomNav />
+        <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
+          <Loader2 className="h-12 w-12 text-hireyth-main animate-spin mb-4" />
+          <p className="text-gray-600 text-lg">Loading profile...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (error) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="glassmorphism-card max-w-lg w-full bg-white/95">
+      <div className="min-h-screen bg-gray-50 pb-20">
+        <BottomNav />
+        <div className="flex flex-col items-center justify-center pt-20 h-[60vh] px-4">
+          <div className="bg-white rounded-lg shadow-md p-6 max-w-md w-full text-center">
           <AlertTriangle className="h-12 w-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-red-800 mb-2">Error</h3>
-          <p className="text-red-700 mb-6">{error}</p>
-          <div className="flex flex-col sm:flex-row gap-3 justify-center">
-            <Button 
-              variant="outline" 
-              onClick={() => window.location.reload()}
-              className="flex items-center gap-2 modern-focus"
-            >
+            <h2 className="text-xl font-semibold text-gray-800 mb-2">Could Not Load Profile</h2>
+            <p className="text-gray-600 mb-6">{error}</p>
+            <div className="flex justify-center gap-4">
+              <Button onClick={() => fetchProfileData()} className="flex items-center gap-2">
               <RefreshCw className="h-4 w-4" />
-              Refresh Page
+                Try Again
             </Button>
-            
-            {error.includes('Database setup') && (
-              <Button 
-                variant="sleek"
-                onClick={async () => {
-                  try {
-                    setLoading(true);
-                    const { createExperiencesTable, createExperienceLikesTable, createExperienceCommentsTable } = await import('@/lib/migrations');
-                    
-                    await createExperiencesTable();
-                    await createExperienceLikesTable();
-                    await createExperienceCommentsTable();
-                    
-                    toast({
-                      title: 'Setup completed',
-                      description: 'Please refresh the page to see your profile.',
-                      duration: 5000,
-                    });
-                    
-                    // Refresh the page after a short delay
-                    setTimeout(() => window.location.reload(), 2000);
-                  } catch (e) {
-                    console.error('Failed to run setup:', e);
-                    toast({
-                      title: 'Setup failed',
-                      description: 'Please try again later.',
-                      variant: 'destructive',
-                    });
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="flex items-center gap-2"
-              >
-                <Server className="h-4 w-4" />
-                Run Setup
+              <Button variant="outline" onClick={() => navigate('/')} className="flex items-center gap-2">
+                <Home className="h-4 w-4" />
+                Go Home
               </Button>
-            )}
+            </div>
           </div>
         </div>
       </div>
     );
   }
   
-  // If profile not found
   if (!profileData) {
     return (
-      <div className="flex flex-col items-center justify-center py-12 px-4 text-center">
-        <div className="glassmorphism-card max-w-lg w-full bg-white/95">
-          <UserX className="h-12 w-12 text-gray-500 mx-auto mb-4" />
-          <h3 className="text-lg font-bold text-gray-800 mb-2">Profile not found</h3>
-          <p className="text-gray-600 mb-6">The profile you're looking for doesn't exist.</p>
-          <Link 
-            to="/" 
-            className="inline-flex items-center gap-2 px-4 py-2 sleek-button rounded-md hover:shadow-lg transition-all duration-300"
-          >
+      <div className="min-h-screen bg-gray-50 pb-20">
+        <BottomNav />
+        <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
+          <UserX className="h-12 w-12 text-red-500 mb-4" />
+          <p className="text-gray-800 text-xl font-medium mb-2">Profile Not Found</p>
+          <p className="text-gray-600 mb-6">The requested profile could not be found.</p>
+          <Button onClick={() => navigate('/')} className="flex items-center gap-2">
             <Home className="h-4 w-4" />
-            Go Home
-          </Link>
+            Return Home
+          </Button>
           </div>
       </div>
     );
   }
 
-  if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)]">
-          <div className="relative">
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" />
-          </div>
-          <p className="text-gray-600 mt-4 font-medium">Loading profile...</p>
-        </div>
-      </div>
-    );
-  }
-  
-  const isOwnProfile = user && profileData && user.id === profileData.id;
-  
+  // Main profile content
   return (
     <div className="min-h-screen bg-gray-50 pb-20">
+      <BottomNav />
       <div className="max-w-4xl mx-auto px-4">
         {/* Profile Header */}
         <div className="mb-8">
@@ -1541,9 +1346,9 @@ const Profile = () => {
             {isEditMode ? (
               <div className="mt-4 mb-6 max-w-lg mx-auto">
                 <label className="text-sm font-medium text-gray-700 mb-1 block">About</label>
-                <Textarea
-                  value={editForm.bio || ''}
-                  onChange={(e) => handleInputChange('bio', e.target.value)}
+              <Textarea
+                value={editForm.bio || ''}
+                onChange={(e) => handleInputChange('bio', e.target.value)}
                   placeholder="Write something about yourself..."
                   className="resize-none h-24 modern-focus"
                 />
@@ -1704,13 +1509,13 @@ const Profile = () => {
                 </Button>
               )}
               </div>
-            </div>
+                </div>
         </div>
         
         {/* Tabs */}
         <div className="mb-6">
           <div className="modern-tabs bg-white rounded-lg shadow-sm mb-6 border border-gray-100 p-0.5">
-            <button
+                <button
               className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
                 activeTab === 'experiences' 
                   ? 'modern-tab-active bg-blue-50 text-blue-600' 
@@ -1720,8 +1525,8 @@ const Profile = () => {
             >
               <Grid className={`w-4 h-4 mr-2 ${activeTab === 'experiences' ? 'text-blue-500' : ''}`} />
               <span>Experiences</span>
-            </button>
-            <button
+                </button>
+                <button
               className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
                 activeTab === 'created' 
                   ? 'modern-tab-active bg-blue-50 text-blue-600' 
@@ -1731,7 +1536,7 @@ const Profile = () => {
             >
               <MapIcon className={`w-4 h-4 mr-2 ${activeTab === 'created' ? 'text-blue-500' : ''}`} />
               <span>Created</span>
-            </button>
+                </button>
             <button
               className={`modern-tab flex items-center px-4 py-3 text-sm font-medium ${
                 activeTab === 'joined' 
@@ -1743,7 +1548,7 @@ const Profile = () => {
               <Bookmark className={`w-4 h-4 mr-2 ${activeTab === 'joined' ? 'text-blue-500' : ''}`} />
               <span>Joined</span>
             </button>
-          </div>
+        </div>
         
           {/* Tab Content */}
           <div>
@@ -1752,14 +1557,14 @@ const Profile = () => {
                 {experiences.length === 0 ? (
                   <div className="text-center py-8">
                     <p className="text-gray-600">No experiences shared yet</p>
-                    {isOwnProfile && (
-                      <Button
-                        onClick={() => setShowAddExperience(true)}
+              {isOwnProfile && (
+                <Button
+                  onClick={() => setShowAddExperience(true)}
                         className="mt-4 sleek-button"
-                      >
+                >
                         Add Your First Experience
-                      </Button>
-                    )}
+                </Button>
+              )}
                   </div>
                 ) : (
                   <>
@@ -1775,7 +1580,7 @@ const Profile = () => {
                     )}
                     <div className="space-y-6">
                   {experiences.map((exp: Experience) => (
-                       <div key={exp.id} className="modern-card bg-white">
+                        <div key={exp.id} className="modern-card bg-white">
                           <div className="relative gradient-overlay">
                             {exp.image_url ? (
                         <img
@@ -1825,13 +1630,13 @@ const Profile = () => {
                             </div>
                             <div className="mt-4 flex justify-between items-center">
                               <div className="flex space-x-2">
-                                <p className="text-xs text-gray-500">
-                                  {new Date(exp.created_at).toLocaleDateString('en-US', { 
-                                    month: 'short', 
-                                    day: 'numeric', 
-                                    year: 'numeric' 
-                                  })}
-                                </p>
+                              <p className="text-xs text-gray-500">
+                                {new Date(exp.created_at).toLocaleDateString('en-US', { 
+                                  month: 'short', 
+                                  day: 'numeric', 
+                                  year: 'numeric' 
+                                })}
+                              </p>
                               </div>
                             </div>
                       </div>
@@ -1851,7 +1656,7 @@ const Profile = () => {
                 {isOwnProfile && (
                   <Button
                     onClick={() => navigate('/create')}
-                    className="mt-4 sleek-button"
+                        className="mt-4 sleek-button"
                   >
                     Create Your First Trip
                   </Button>
@@ -1873,7 +1678,7 @@ const Profile = () => {
                 {isOwnProfile && (
                   <Button
                     onClick={() => navigate('/trips')}
-                    className="mt-4 sleek-button"
+                        className="mt-4 sleek-button"
                   >
                     Explore Trips
                   </Button>
@@ -1903,8 +1708,6 @@ const Profile = () => {
         
         {/* Following Dialog */}
         {renderFollowingDialog()}
-        
-        <BottomNav />
       </div>
     </div>
   );

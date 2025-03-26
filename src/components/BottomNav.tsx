@@ -2,6 +2,8 @@ import * as React from "react"
 import { useNavigate, useLocation } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { Compass, Map, User } from "lucide-react"
+import { Link } from "react-router-dom"
+import { BugIcon } from "lucide-react"
 
 interface NavItem {
   icon: React.ReactNode
@@ -96,6 +98,18 @@ export function BottomNav({ className }: BottomNavProps) {
             </button>
           )
         })}
+        {process.env.NODE_ENV === 'development' && (
+          <Link
+            to="/debug"
+            className={cn(
+              "flex flex-col items-center px-2 py-1 text-center text-xs",
+              currentPath === "/debug" ? "text-indigo-600" : "text-gray-600"
+            )}
+          >
+            <BugIcon className="h-5 w-5" />
+            <span>Debug</span>
+          </Link>
+        )}
       </div>
     </div>
   )

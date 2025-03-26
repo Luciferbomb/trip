@@ -17,12 +17,28 @@ export default defineConfig(({ mode }) => ({
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),
+      "react-hot-toast": path.resolve(__dirname, "node_modules/react-hot-toast"),
     },
+    dedupe: ['react', 'react-dom', 'react-hot-toast'],
+  },
+  optimizeDeps: {
+    include: ['react-hot-toast'],
+    force: true,
   },
   build: {
     rollupOptions: {
       input: {
         main: path.resolve(__dirname, 'index.html'),
+      },
+      external: [],
+      onwarn(warning, warn) {
+        // Skip certain warnings
+        if (warning.code === 'MODULE_LEVEL_DIRECTIVE' || 
+            warning.message.includes('react-hot-toast')) {
+          return;
+        }
+        // Use default for everything else
+        warn(warning);
       },
     },
     outDir: 'dist',

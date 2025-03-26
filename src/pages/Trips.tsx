@@ -14,12 +14,15 @@ import {
 } from "@/components/ui/popover";
 import { format, isWithinInterval, parseISO } from 'date-fns';
 import { cn } from '@/lib/utils';
+import EnhancedTripCard from '@/components/EnhancedTripCard';
+import { useToast } from '@/components/ui/use-toast';
 
 // List of countries and activities for filters
 const countries = ["All", "Greece", "Japan", "Norway", "Thailand", "USA", "Italy", "France"];
 const activities = ["All", "Beach", "Hiking", "Cultural", "Food", "Sightseeing", "Aurora Viewing"];
 
 const Trips = () => {
+  const { toast } = useToast();
   const [searchTerm, setSearchTerm] = useState('');
   const [showFilters, setShowFilters] = useState(false);
   const [filters, setFilters] = useState({
@@ -37,10 +40,18 @@ const Trips = () => {
     const fetchTrips = async () => {
       try {
         setLoading(true);
+        setTrips([]); // Clear existing trips while loading
         
         let query = supabase
           .from('trips')
-          .select('*')
+          .select(`
+            *,
+            creator:users!creator_id (
+              id,
+              name,
+              profile_image
+            )
+          `)
           .eq('status', 'active');
         
         // Apply date filters if set
@@ -56,14 +67,24 @@ const Trips = () => {
         
         const { data, error } = await query;
         
-        if (error) {
-          console.error('Error fetching trips:', error);
-          setTrips([]);
-        } else {
-          setTrips(data || []);
-        }
-      } catch (error) {
-        console.error('Error:', error);
+        if (error) throw error;
+        
+        // Transform the data to include creator information
+        const transformedTrips = (data || []).map(trip => ({
+          ...trip,
+          creator_name: trip.creator?.name || 'Unknown',
+          creator_image: trip.creator?.profile_image || '',
+          creator_id: trip.creator?.id
+        }));
+        
+        setTrips(transformedTrips);
+      } catch (error: any) {
+        console.error('Error fetching trips:', error);
+        toast({
+          title: 'Error',
+          description: 'Failed to load trips. Please try again.',
+          variant: 'destructive'
+        });
         setTrips([]);
       } finally {
         setLoading(false);
@@ -352,7 +373,7 @@ const Trips = () => {
           ) : (
             <div className="grid gap-4">
               {filteredTrips.map((trip) => (
-                <TripCard 
+                <EnhancedTripCard 
                   key={trip.id}
                   {...mapTripToCardProps(trip)}
                 />

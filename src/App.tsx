@@ -16,14 +16,14 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { BrowserRouter as Router } from 'react-router-dom';
 import { Link } from 'react-router-dom';
 import { supabase } from './lib/supabase';
-import runMigrations from './lib/migrations';
+import { runMigrations } from './lib/migrations';
 import { cn } from './lib/utils';
 import { AuthProvider, useAuth } from './lib/auth-context';
-// import { Toaster } from 'react-hot-toast';
 import ToastProvider from './components/ToastProvider';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import AppHeader from '@/components/AppHeader';
 import DesktopRestriction from './components/DesktopRestriction';
+import { Toaster } from './components/ui/toaster';
 
 // Simple scrollToTop function
 const scrollToTop = (smooth = true) => {
@@ -57,9 +57,22 @@ import Contact from './pages/Contact';
 import Terms from './pages/Terms';
 import Privacy from './pages/Privacy';
 import { BottomNav } from './components/BottomNav';
+import ChatDemo from './pages/ChatDemo';
+import Debug from './pages/debug';
+import UIShowcase from './pages/ui-showcase';
 
 // Create a client for react-query
-const queryClient = new QueryClient();
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      refetchOnWindowFocus: false,
+      refetchOnMount: false,
+      refetchOnReconnect: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // 5min
+    },
+  },
+});
 
 // Error Boundary component to catch rendering errors
 interface ErrorBoundaryProps {
@@ -145,6 +158,8 @@ const ProtectedRoute = ({ children, requireOnboarding = true }: { children: Reac
       if (!user) return;
       
       try {
+        setCheckingOnboarding(true);
+        
         const { data, error } = await supabase
           .from('users')
           .select('onboarding_completed')
@@ -153,12 +168,20 @@ const ProtectedRoute = ({ children, requireOnboarding = true }: { children: Reac
           
         if (error) {
           console.error('Error checking onboarding status:', error);
+          // Default to false to ensure safety if we can't determine status
           setIsOnboardingCompleted(false);
         } else {
-          setIsOnboardingCompleted(data?.onboarding_completed || false);
+          // Check if data exists before accessing properties
+          const onboardingStatus = data?.onboarding_completed ?? false;
+          setIsOnboardingCompleted(onboardingStatus);
+          
+          // If not onboarded and route requires onboarding, pre-emptively navigate to onboarding
+          if (requireOnboarding && !onboardingStatus) {
+            navigate('/onboarding', { replace: true });
+          }
         }
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Error checking onboarding:', error);
         setIsOnboardingCompleted(false);
       } finally {
         setCheckingOnboarding(false);
@@ -170,10 +193,21 @@ const ProtectedRoute = ({ children, requireOnboarding = true }: { children: Reac
     } else {
       setCheckingOnboarding(false);
     }
-  }, [user]);
+  }, [user, navigate, requireOnboarding]);
   
   if (loading || checkingOnboarding) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="relative">
+          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
+          <svg className="w-12 h-12 animate-spin text-blue-600 relative" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <p className="text-gray-600 mt-4 font-medium">Loading...</p>
+      </div>
+    );
   }
   
   if (!user) {
@@ -199,6 +233,8 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
       if (!user) return;
       
       try {
+        setCheckingOnboarding(true);
+        
         const { data, error } = await supabase
           .from('users')
           .select('onboarding_completed')
@@ -207,12 +243,15 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
           
         if (error) {
           console.error('Error checking onboarding status:', error);
+          // Default to false to ensure user can access onboarding
           setIsOnboardingCompleted(false);
         } else {
-          setIsOnboardingCompleted(data?.onboarding_completed || false);
+          // Check if data exists before accessing properties
+          const onboardingStatus = data?.onboarding_completed ?? false;
+          setIsOnboardingCompleted(onboardingStatus);
         }
       } catch (error) {
-        console.error('Error:', error);
+        console.error('Error checking onboarding:', error);
         setIsOnboardingCompleted(false);
       } finally {
         setCheckingOnboarding(false);
@@ -227,7 +266,18 @@ const OnboardingRoute = ({ children }: { children: React.ReactNode }) => {
   }, [user]);
   
   if (loading || checkingOnboarding) {
-    return <div className="flex items-center justify-center min-h-screen">Loading...</div>;
+    return (
+      <div className="flex flex-col items-center justify-center min-h-screen bg-gray-50">
+        <div className="relative">
+          <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
+          <svg className="w-12 h-12 animate-spin text-blue-600 relative" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        </div>
+        <p className="text-gray-600 mt-4 font-medium">Loading...</p>
+      </div>
+    );
   }
   
   if (!user) {
@@ -279,8 +329,41 @@ const AppRoutes = () => {
   useEffect(() => {
     const initDb = async () => {
       try {
-        const success = await runMigrations();
+        // Check if migrations have already run in this session
+        const lastMigrationTime = localStorage.getItem('hireyth_db_migration_time');
+        const currentTime = Date.now();
+        const oneHourMs = 60 * 60 * 1000;
+        
+        // Get app version - using package.json version or a fixed value
+        const appVersion = import.meta.env.VITE_APP_VERSION || '1.0.0';
+        const lastAppVersion = localStorage.getItem('hireyth_app_version');
+        
+        // Only run migrations if:
+        // 1. No previous migration has been recorded, or
+        // 2. It's been more than an hour since last migration, or
+        // 3. App version has changed
+        const shouldRunMigrations = 
+          !lastMigrationTime || 
+          (currentTime - parseInt(lastMigrationTime, 10)) > oneHourMs ||
+          lastAppVersion !== appVersion;
+          
+        let success = true;
+        
+        if (shouldRunMigrations) {
+          console.log('Running database migrations...');
+          success = await runMigrations();
+          
+          // Store the migration timestamp and app version
+          if (success) {
+            localStorage.setItem('hireyth_db_migration_time', currentTime.toString());
+            localStorage.setItem('hireyth_app_version', appVersion);
+          }
+        } else {
+          console.log('Skipping database migrations - already run recently');
+        }
+        
         setIsDbInitialized(success);
+        
         if (!success) {
           setDbError('Database initialization failed. Some features may not work properly.');
         }
@@ -415,7 +498,7 @@ const AppRoutes = () => {
               </ProtectedRoute>
             } />
             <Route path="/explore" element={
-              <ProtectedRoute>
+              <ProtectedRoute requireOnboarding={false}>
                 <PageTransition>
                   <Explore />
                 </PageTransition>
@@ -448,6 +531,21 @@ const AppRoutes = () => {
                 </PageTransition>
               </ProtectedRoute>
             } />
+            <Route path="/chat-demo" element={
+              <PageTransition>
+                <ChatDemo />
+              </PageTransition>
+            } />
+            <Route path="/debug" element={
+              <PageTransition>
+                <Debug />
+              </PageTransition>
+            } />
+            <Route path="/ui-showcase" element={
+              <PageTransition>
+                <UIShowcase />
+              </PageTransition>
+            } />
             <Route path="*" element={
               <PageTransition>
                 <NotFound />
@@ -479,9 +577,40 @@ const AppContent = () => {
 };
 
 const App = () => {
+  const [migrationChecked, setMigrationChecked] = useState(false);
+  
+  // Check database tables on app start - but only check once
+  useEffect(() => {
+    // If migrations were already checked in this session, don't run again
+    const migrationCheckKey = 'hireyth_migration_check';
+    const alreadyChecked = sessionStorage.getItem(migrationCheckKey);
+    
+    if (alreadyChecked) {
+      console.log('Skipping database migration check - already performed in this session');
+      setMigrationChecked(true);
+      return;
+    }
+    
+    const checkDatabase = async () => {
+      try {
+        console.log('Checking database tables on app start...');
+        await runMigrations(false);
+        console.log('Database migration check completed');
+        
+        // Mark as checked for this session
+        sessionStorage.setItem(migrationCheckKey, 'true');
+      } catch (error) {
+        console.error('Error during database migration check:', error);
+      } finally {
+        setMigrationChecked(true);
+      }
+    };
+    
+    checkDatabase();
+  }, []);
+  
   return (
     <QueryClientProvider client={queryClient}>
-      {/* <Toaster /> */}
       <ToastProvider>
         <AuthProvider>
           <Router>
@@ -493,6 +622,7 @@ const App = () => {
           </Router>
         </AuthProvider>
       </ToastProvider>
+      <Toaster />
     </QueryClientProvider>
   );
 };

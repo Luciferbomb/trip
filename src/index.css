@@ -780,11 +780,11 @@ input:focus, textarea:focus, select:focus {
 
 /* Add animation for new chat messages */
 @keyframes fadeInUp {
-  from {
+  0% {
     opacity: 0;
     transform: translateY(10px);
   }
-  to {
+  100% {
     opacity: 1;
     transform: translateY(0);
   }

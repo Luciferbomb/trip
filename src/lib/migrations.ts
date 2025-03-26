@@ -196,6 +196,29 @@ BEGIN
 END $$;
 `;
 
+// SQL for creating the experience_likes table
+const createExperienceLikesTableSQL = `
+CREATE TABLE IF NOT EXISTS experience_likes (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  experience_id UUID REFERENCES experiences(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  UNIQUE(experience_id, user_id)
+);
+`;
+
+// SQL for creating the experience_comments table
+const createExperienceCommentsTableSQL = `
+CREATE TABLE IF NOT EXISTS experience_comments (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  experience_id UUID REFERENCES experiences(id) ON DELETE CASCADE,
+  user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+  comment TEXT NOT NULL,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+`;
+
 /**
  * Execute SQL directly using Supabase's REST API
  * @param sql SQL statement to execute
@@ -540,29 +563,282 @@ export const addOnboardingCompletedField = async (): Promise<boolean> => {
   return await executeSQL(addOnboardingCompletedFieldSQL);
 };
 
+// Create placeholder functions if they don't exist
+const createPlaceholderFunctions = async (): Promise<boolean> => {
+  try {
+    const sql = `
+      -- Create placeholder functions for migrations
+      CREATE OR REPLACE FUNCTION create_experience_likes_table()
+      RETURNS void AS $$
+      BEGIN
+        NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+
+      CREATE OR REPLACE FUNCTION create_experience_comments_table()
+      RETURNS void AS $$
+      BEGIN
+        NULL;
+      END;
+      $$ LANGUAGE plpgsql;
+    `;
+
+    const { error } = await supabase.rpc('exec_sql', { sql });
+    
+    if (error) {
+      console.error('Error creating placeholder functions:', error);
+      return false;
+    }
+    
+    console.log('Placeholder functions created successfully');
+    return true;
+  } catch (error) {
+    console.error('Error:', error);
+    return false;
+  }
+};
+
+/**
+ * Creates the trip_chats table if it doesn't exist
+ */
+export const createTripChatsTable = async () => {
+  try {
+    // Create trip_chats table
+    await supabase.rpc('exec_sql', {
+      sql_statement: `
+        -- Create trip_chats table
+        CREATE TABLE IF NOT EXISTS trip_chats (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          trip_id UUID NOT NULL REFERENCES trips(id) ON DELETE CASCADE,
+          title TEXT NOT NULL DEFAULT 'Trip Discussion',
+          description TEXT,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+
+        -- Create index for better performance
+        CREATE INDEX IF NOT EXISTS idx_trip_chats_trip_id ON trip_chats(trip_id);
+        
+        -- Enable Row Level Security
+        ALTER TABLE trip_chats ENABLE ROW LEVEL SECURITY;
+
+        -- Create policies for trip_chats table
+        DROP POLICY IF EXISTS "Anyone can view trip chats" ON trip_chats;
+        CREATE POLICY "Anyone can view trip chats" 
+          ON trip_chats FOR SELECT 
+          TO authenticated 
+          USING (true);
+
+        DROP POLICY IF EXISTS "Trip creators can create chats" ON trip_chats;
+        CREATE POLICY "Trip creators can create chats" 
+          ON trip_chats FOR INSERT 
+          TO authenticated 
+          WITH CHECK (
+            EXISTS (
+              SELECT 1 FROM trips 
+              WHERE trips.id = trip_id AND trips.creator_id = auth.uid()
+            ) OR
+            EXISTS (
+              SELECT 1 FROM trip_participants
+              WHERE trip_participants.trip_id = trip_id
+              AND trip_participants.user_id = auth.uid()
+              AND trip_participants.status = 'approved'
+            )
+          );
+
+        DROP POLICY IF EXISTS "Trip creators can update chats" ON trip_chats;
+        CREATE POLICY "Trip creators can update chats" 
+          ON trip_chats FOR UPDATE 
+          TO authenticated 
+          USING (EXISTS (
+            SELECT 1 FROM trips 
+            WHERE trips.id = trip_id AND trips.creator_id = auth.uid()
+          ));
+
+        -- Grant permissions to authenticated users
+        GRANT ALL ON trip_chats TO authenticated;
+      `
+    });
+
+    console.log('Trip chats table created or already exists');
+    return true;
+  } catch (error) {
+    console.error('Error creating trip_chats table:', error);
+    return false;
+  }
+};
+
+/**
+ * Creates the trip_messages table if it doesn't exist
+ */
+export const createTripMessagesTable = async () => {
+  try {
+    // Create trip_messages table
+    await supabase.rpc('exec_sql', {
+      sql_statement: `
+        -- Create trip_messages table
+        CREATE TABLE IF NOT EXISTS trip_messages (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          chat_id UUID NOT NULL REFERENCES trip_chats(id) ON DELETE CASCADE,
+          user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+          message TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+        
+        -- Create indexes for better performance
+        CREATE INDEX IF NOT EXISTS idx_trip_messages_chat_id ON trip_messages(chat_id);
+        CREATE INDEX IF NOT EXISTS idx_trip_messages_user_id ON trip_messages(user_id);
+        
+        -- Enable Row Level Security
+        ALTER TABLE trip_messages ENABLE ROW LEVEL SECURITY;
+        
+        -- Create policies for trip_messages table
+        DROP POLICY IF EXISTS "Anyone can view trip messages" ON trip_messages;
+        CREATE POLICY "Anyone can view trip messages" 
+          ON trip_messages FOR SELECT 
+          TO authenticated 
+          USING (true);
+
+        DROP POLICY IF EXISTS "Approved participants can send messages" ON trip_messages;
+        CREATE POLICY "Approved participants can send messages" 
+          ON trip_messages FOR INSERT 
+          TO authenticated 
+          WITH CHECK (
+            -- Trip creator can send messages
+            EXISTS (
+              SELECT 1 FROM trip_chats
+              JOIN trips ON trips.id = trip_chats.trip_id
+              WHERE trip_chats.id = chat_id
+              AND trips.creator_id = auth.uid()
+            ) OR
+            -- Approved participants can send messages
+            EXISTS (
+              SELECT 1 FROM trip_participants
+              JOIN trip_chats ON trip_chats.trip_id = trip_participants.trip_id
+              WHERE trip_chats.id = chat_id
+              AND trip_participants.user_id = auth.uid()
+              AND trip_participants.status = 'approved'
+            )
+          );
+
+        DROP POLICY IF EXISTS "Users can only update their own messages" ON trip_messages;
+        CREATE POLICY "Users can only update their own messages" 
+          ON trip_messages FOR UPDATE 
+          TO authenticated 
+          USING (user_id = auth.uid());
+
+        DROP POLICY IF EXISTS "Users can only delete their own messages" ON trip_messages;
+        CREATE POLICY "Users can only delete their own messages" 
+          ON trip_messages FOR DELETE 
+          TO authenticated 
+          USING (user_id = auth.uid());
+          
+        -- Trigger function to update the updated_at column
+        CREATE OR REPLACE FUNCTION update_trip_chat_timestamp()
+        RETURNS TRIGGER AS $$
+        BEGIN
+          NEW.updated_at = NOW();
+          RETURN NEW;
+        END;
+        $$ language 'plpgsql';
+
+        -- Create triggers for updated_at columns
+        DROP TRIGGER IF EXISTS update_trip_chats_timestamp ON trip_chats;
+        CREATE TRIGGER update_trip_chats_timestamp
+        BEFORE UPDATE ON trip_chats
+        FOR EACH ROW
+        EXECUTE FUNCTION update_trip_chat_timestamp();
+
+        DROP TRIGGER IF EXISTS update_trip_messages_timestamp ON trip_messages;
+        CREATE TRIGGER update_trip_messages_timestamp
+        BEFORE UPDATE ON trip_messages
+        FOR EACH ROW
+        EXECUTE FUNCTION update_trip_chat_timestamp();
+        
+        -- Grant permissions to authenticated users
+        GRANT ALL ON trip_messages TO authenticated;
+      `
+    });
+
+    console.log('Trip messages table created or already exists');
+    return true;
+  } catch (error) {
+    console.error('Error creating trip_messages table:', error);
+    return false;
+  }
+};
+
 /**
  * Run all migrations to set up the database
  * @param insertSamples Whether to insert sample data
  * @returns Promise<boolean> indicating success or failure
  */
-export const runMigrations = async (insertSamples: boolean = true): Promise<boolean> => {
+export const runMigrations = async (insertSamples: boolean = false): Promise<boolean> => {
   console.log('Running database migrations...');
   
   try {
-    // Create tables if they don't exist
-    await createUsersTable();
-    await createTripsTable();
-    await createNotificationsTable();
-    await createTripParticipantsTable();
-    await createExperiencesTable();
-    await createUserFollowsTable();
-    await createExperienceLikesTable();
-    await createExperienceCommentsTable();
+    // First, check which tables exist to avoid redundant operations
+    const { data: existingTables, error: tablesError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name')
+      .eq('table_schema', 'public');
+      
+    if (tablesError) {
+      console.warn('Unable to fetch existing tables:', tablesError);
+      // Continue with migrations even if we can't check existing tables
+    }
     
-    // Insert sample data in development mode
+    // Convert to a Set for O(1) lookups
+    const existingTableSet = new Set(existingTables?.map(t => t.table_name) || []);
+    const tableExists = (tableName: string) => existingTableSet.has(tableName);
+    
+    // Create placeholder functions first (if needed)
+    await createPlaceholderFunctions();
+    
+    // Create tables only if they don't exist
+    if (!tableExists('users')) await createUsersTable();
+    if (!tableExists('trips')) await createTripsTable();
+    if (!tableExists('notifications')) await createNotificationsTable();
+    if (!tableExists('trip_participants')) await createTripParticipantsTable();
+    if (!tableExists('experiences')) await createExperiencesTable();
+    if (!tableExists('user_follows')) await createUserFollowsTable();
+    
+    // Create chat-related tables
+    if (!tableExists('trip_chats')) await createTripChatsTable();
+    if (!tableExists('trip_messages')) await createTripMessagesTable();
+    
+    // Only try to create these if they don't exist
+    if (!tableExists('experience_likes')) {
+      try {
+        await createExperienceLikesTable();
+      } catch (error) {
+        console.warn('Experience likes table creation skipped:', error);
+      }
+    }
+    
+    if (!tableExists('experience_comments')) {
+      try {
+        await createExperienceCommentsTable();
+      } catch (error) {
+        console.warn('Experience comments table creation skipped:', error);
+      }
+    }
+    
+    // Insert sample data in development mode only if tables are empty
     if (insertSamples && import.meta.env.DEV) {
-      await insertSampleUsers();
-      await insertSampleTrips();
+      // Check if users table is empty
+      const { count: userCount, error: countError } = await supabase
+        .from('users')
+        .select('*', { count: 'exact', head: true });
+        
+      if (!countError && (userCount === 0 || userCount === null)) {
+        console.log('Inserting sample data...');
+        await insertSampleUsers();
+        await insertSampleTrips();
+      } else {
+        console.log('Skipping sample data insertion - tables already contain data');
+      }
     }
     
     // Make sure onboarding_completed field exists
@@ -578,14 +854,76 @@ export const runMigrations = async (insertSamples: boolean = true): Promise<bool
 
 export const createExperienceLikesTable = async (): Promise<boolean> => {
   try {
-    const { error } = await supabase.rpc('create_experience_likes_table', {});
+    // First check if the table exists
+    const { count, error: checkError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name', { count: 'exact', head: true })
+      .eq('table_name', 'experience_likes')
+      .eq('table_schema', 'public');
     
-    if (error) {
-      console.error('Error creating experience_likes table:', error);
-      return false;
+    if (count && count > 0) {
+      console.log('Experience likes table already exists');
+      return true;
     }
     
-    console.log('Experience likes table created or already exists');
+    // Create the basic table directly if it doesn't exist
+    const { error } = await supabase.rpc('execute_sql', {
+      sql_query: `
+        CREATE TABLE IF NOT EXISTS experience_likes (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          experience_id UUID REFERENCES experiences(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          UNIQUE(experience_id, user_id)
+        );
+      `
+    });
+    
+    if (error) {
+      // If the direct approach doesn't work, create via the REST API
+      console.error('Error creating experience_likes table:', error);
+      
+      // Create the table object via REST API
+      const createTableResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/experience_likes`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_KEY,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_KEY}`
+        },
+        body: JSON.stringify({
+          definition: {
+            id: {
+              type: 'uuid',
+              primaryKey: true,
+              default: { type: 'expression', value: 'uuid_generate_v4()' }
+            },
+            experience_id: {
+              type: 'uuid',
+              references: 'experiences.id',
+              on_delete: 'cascade'
+            },
+            user_id: {
+              type: 'uuid',
+              references: 'users.id',
+              on_delete: 'cascade'
+            },
+            created_at: {
+              type: 'timestamp with time zone',
+              default: { type: 'expression', value: 'now()' }
+            }
+          },
+          unique_constraints: [['experience_id', 'user_id']]
+        })
+      });
+      
+      if (!createTableResponse.ok) {
+        console.error('Failed to create experience_likes table via REST:', await createTableResponse.text());
+        return false;
+      }
+    }
+    
+    console.log('Experience likes table created successfully');
     return true;
   } catch (error) {
     console.error('Error:', error);
@@ -595,14 +933,84 @@ export const createExperienceLikesTable = async (): Promise<boolean> => {
 
 export const createExperienceCommentsTable = async (): Promise<boolean> => {
   try {
-    const { error } = await supabase.rpc('create_experience_comments_table', {});
+    // First check if the table exists
+    const { count, error: checkError } = await supabase
+      .from('information_schema.tables')
+      .select('table_name', { count: 'exact', head: true })
+      .eq('table_name', 'experience_comments')
+      .eq('table_schema', 'public');
     
-    if (error) {
-      console.error('Error creating experience_comments table:', error);
-      return false;
+    if (count && count > 0) {
+      console.log('Experience comments table already exists');
+      return true;
     }
     
-    console.log('Experience comments table created or already exists');
+    // Create the basic table directly if it doesn't exist
+    const { error } = await supabase.rpc('execute_sql', {
+      sql_query: `
+        CREATE TABLE IF NOT EXISTS experience_comments (
+          id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+          experience_id UUID REFERENCES experiences(id) ON DELETE CASCADE,
+          user_id UUID REFERENCES users(id) ON DELETE CASCADE,
+          comment TEXT NOT NULL,
+          created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+          updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+        );
+      `
+    });
+    
+    if (error) {
+      // If the direct approach doesn't work, create via the REST API
+      console.error('Error creating experience_comments table:', error);
+      
+      // Create the table object via REST API
+      const createTableResponse = await fetch(`${import.meta.env.VITE_SUPABASE_URL}/rest/v1/experience_comments`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'apikey': import.meta.env.VITE_SUPABASE_KEY,
+          'Authorization': `Bearer ${import.meta.env.VITE_SUPABASE_KEY}`
+        },
+        body: JSON.stringify({
+          definition: {
+            id: {
+              type: 'uuid',
+              primaryKey: true,
+              default: { type: 'expression', value: 'uuid_generate_v4()' }
+            },
+            experience_id: {
+              type: 'uuid',
+              references: 'experiences.id',
+              on_delete: 'cascade'
+            },
+            user_id: {
+              type: 'uuid',
+              references: 'users.id',
+              on_delete: 'cascade'
+            },
+            comment: {
+              type: 'text',
+              notNull: true
+            },
+            created_at: {
+              type: 'timestamp with time zone',
+              default: { type: 'expression', value: 'now()' }
+            },
+            updated_at: {
+              type: 'timestamp with time zone',
+              default: { type: 'expression', value: 'now()' }
+            }
+          }
+        })
+      });
+      
+      if (!createTableResponse.ok) {
+        console.error('Failed to create experience_comments table via REST:', await createTableResponse.text());
+        return false;
+      }
+    }
+    
+    console.log('Experience comments table created successfully');
     return true;
   } catch (error) {
     console.error('Error:', error);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Upload, Calendar, MapPin, Check, ChevronsUpDown, Plus, Loader2, ArrowRight } from 'lucide-react';
+import { ArrowLeft, Upload, Calendar, MapPin, Check, ChevronsUpDown, Plus, Loader2, ArrowRight, Camera } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -296,27 +296,27 @@ const CreateTrip = () => {
           >
             <ArrowLeft className="w-5 h-5" />
           </Button>
-          <h1 className="text-xl font-semibold text-gray-900">Create Your Trip</h1>
+          <h1 className="text-xl font-semibold text-gray-900">Create Event</h1>
         </div>
       </div>
 
       {/* Main Container */}
       <div className="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 relative z-10">
         <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Step 1: Order Info */}
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+          {/* Step 1: Event Details */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm">
                 1
               </div>
-              <h3 className="text-lg font-semibold text-gray-800">Trip Details</h3>
+              <h3 className="text-lg font-semibold">Event Details</h3>
             </div>
 
             <div className="space-y-6">
-              {/* Trip Title */}
+              {/* Event Title */}
               <div>
                 <Label htmlFor="title" className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Trip Title <span className="text-red-500">*</span>
+                  Event Name <span className="text-red-500">*</span>
                 </Label>
                 <Input 
                   type="text" 
@@ -324,12 +324,27 @@ const CreateTrip = () => {
                   value={title}
                   onChange={(e) => setTitle(e.target.value)}
                   className="w-full bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-100"
-                  placeholder="e.g., Weekend Getaway to Mountains"
+                  placeholder="Give your event a name"
                   required
                 />
               </div>
 
-              {/* Dates */}
+              {/* Event Description */}
+              <div>
+                <Label htmlFor="description" className="text-sm font-medium text-gray-700 mb-1.5 block">
+                  Description <span className="text-red-500">*</span>
+                </Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Share details about your event..."
+                  className="min-h-[120px] resize-y w-full p-3 bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-100 rounded-lg"
+                  required
+                />
+              </div>
+
+              {/* Event Dates */}
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
@@ -389,95 +404,91 @@ const CreateTrip = () => {
                   </Popover>
                 </div>
               </div>
-
-              {/* Trip Description */}
-              <div>
-                <Label htmlFor="description" className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Trip Details <span className="text-red-500">*</span>
-                </Label>
-                <Textarea
-                  id="description"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  placeholder="Enter short trip details for accurate quote"
-                  className="min-h-[120px] resize-y w-full p-3 bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-100 rounded-lg"
-                  required
-                />
-              </div>
             </div>
           </div>
 
-          {/* Step 2: Upload Artwork */}
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
+          {/* Step 2: Event Location */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm">
                 2
               </div>
-              <h3 className="text-lg font-semibold text-gray-800">Trip Image</h3>
+              <h3 className="text-lg font-semibold">Event Location</h3>
             </div>
 
             <div className="space-y-4">
-              <div>
-                <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
-                  Select print placement
-                </Label>
-                <div className="grid grid-cols-2 gap-3">
-                  <div 
-                    className={cn(
-                      "p-3 border rounded-lg cursor-pointer transition-all",
-                      image ? "border-blue-500 bg-blue-50" : "border-gray-200 hover:border-blue-200"
-                    )}
-                    onClick={() => document.getElementById('trip-image')?.click()}
-                  >
-                    <div className="aspect-video rounded-md overflow-hidden bg-gray-100 flex items-center justify-center">
-                      {image ? (
-                        <img 
-                          src={image} 
-                          alt="Trip cover" 
-                          className="w-full h-full object-cover"
-                        />
-                      ) : (
-                        <div className="text-center">
-                          <Upload className="w-8 h-8 text-gray-400 mx-auto mb-2" />
-                          <p className="text-sm text-gray-600">Upload Image</p>
-                        </div>
-                      )}
-                    </div>
-                    <input 
-                      type="file" 
-                      id="trip-image" 
-                      className="hidden" 
-                      accept="image/*"
-                      onChange={handleImageChange}
-                    />
-                    <p className="text-xs text-gray-500 mt-2 text-center">
-                      {image ? 'Click to change' : 'Front cover image'}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Step 3: Contact Info */}
-          <div className="bg-white rounded-2xl shadow-sm border border-blue-100 p-6">
-            <div className="flex items-center gap-3 mb-6">
-              <div className="w-8 h-8 rounded-full bg-blue-600 text-white flex items-center justify-center font-semibold">
-                3
-              </div>
-              <h3 className="text-lg font-semibold text-gray-800">Additional Details</h3>
-            </div>
-
-            <div className="space-y-4">
-              {/* Location */}
               <div className="space-y-2">
-                <Label>Location</Label>
+                <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                  Location <span className="text-red-500">*</span>
+                </Label>
                 <MapboxSearch 
                   onLocationSelect={handleLocationSelect}
                   className="w-full"
                 />
               </div>
+            </div>
+          </div>
 
+          {/* Step 3: Event Photo */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm">
+                3
+              </div>
+              <h3 className="text-lg font-semibold">Event Photo</h3>
+            </div>
+
+            <div className="space-y-4">
+              <div>
+                <Label className="text-sm font-medium text-gray-700 mb-1.5 block">
+                  Upload Photo
+                </Label>
+                <div className="mt-2">
+                  <div 
+                    className="relative aspect-video rounded-lg overflow-hidden bg-gray-100 border-2 border-dashed border-gray-300 hover:border-gray-400 transition-colors cursor-pointer"
+                    onClick={() => document.getElementById('trip-image')?.click()}
+                  >
+                    {image ? (
+                      <>
+                        <img 
+                          src={image} 
+                          alt="Event cover" 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black/50 flex items-center justify-center opacity-0 hover:opacity-100 transition-opacity">
+                          <Camera className="w-8 h-8 text-white" />
+                        </div>
+                      </>
+                    ) : (
+                      <div className="absolute inset-0 flex flex-col items-center justify-center">
+                        <Camera className="w-8 h-8 text-gray-400 mb-2" />
+                        <p className="text-sm text-gray-500">Click to upload a photo</p>
+                        <p className="text-xs text-gray-400 mt-1">PNG, JPG, WEBP up to 5MB</p>
+                      </div>
+                    )}
+                  </div>
+                  <input 
+                    type="file" 
+                    id="trip-image" 
+                    className="hidden" 
+                    accept="image/*"
+                    onChange={handleImageChange}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Step 4: Additional Details */}
+          <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-6">
+            <div className="flex items-center gap-3 mb-6">
+              <div className="flex items-center justify-center w-8 h-8 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-semibold text-sm">
+                4
+              </div>
+              <h3 className="text-lg font-semibold">Additional Details</h3>
+            </div>
+
+            <div className="space-y-6">
               {/* Number of Spots */}
               <div>
                 <Label htmlFor="spots" className="text-sm font-medium text-gray-700 mb-1.5 block">
@@ -534,23 +545,23 @@ const CreateTrip = () => {
           {/* Submit Button */}
           <Button 
             type="submit" 
-            className="w-full py-6 text-base font-semibold bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white rounded-xl shadow-md transition-all duration-200 hover:shadow-lg border-0"
             disabled={isSubmitting || loading}
+            className="w-full bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-semibold h-12 rounded-lg shadow-lg hover:shadow-xl transition-all duration-200"
           >
             {loading ? (
               <div className="flex items-center justify-center">
                 <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                <span>Creating your trip...</span>
+                <span>Creating event...</span>
               </div>
             ) : (
               <div className="flex items-center justify-center">
-                <span>Create Trip</span>
+                <span>Create Event</span>
                 <ArrowRight className="ml-2 h-5 w-5" />
               </div>
             )}
           </Button>
           <p className="text-xs text-center text-gray-500 mt-3">
-            By creating a trip, you agree to our Terms of Service and Community Guidelines
+            By creating an event, you agree to our Terms of Service and Community Guidelines
           </p>
         </form>
       </div>
