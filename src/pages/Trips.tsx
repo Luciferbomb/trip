@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { SearchIcon, Filter, X, ChevronDown, Plus, Calendar, Loader2, MapPin } from 'lucide-react';
+import { SearchIcon, Filter, X, ChevronDown, Plus, Calendar, Loader2, MapPin, Plane } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -20,6 +20,22 @@ import { BackgroundGradient } from "@/components/ui/background-gradient";
 // List of countries and activities for filters
 const countries = ["All", "Greece", "Japan", "Norway", "Thailand", "USA", "Italy", "France"];
 const activities = ["All", "Beach", "Hiking", "Cultural", "Food", "Sightseeing", "Aurora Viewing"];
+
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
+      <div className="relative">
+        <div className="h-32 w-32 rounded-full border-4 border-white relative bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+          <Plane className="h-16 w-16 text-white" strokeWidth={0.5} fill="currentColor" />
+        </div>
+      </div>
+      <div className="mt-6 text-center">
+        <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mx-auto mb-2"></div>
+        <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mx-auto"></div>
+      </div>
+    </div>
+  </div>
+);
 
 const Trips = () => {
   const { toast } = useToast();
@@ -144,19 +160,9 @@ const Trips = () => {
   // Calculate header height based on filter visibility
   const headerHeight = showFilters ? 270 : 140;
   
-  // Show consistent loader during initial loading
+  // Update the loading state
   if (loading) {
-    return (
-      <div className="min-h-screen bg-gray-50">
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
-          <div className="relative">
-            <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
-            <Loader2 className="w-12 h-12 animate-spin text-blue-600 relative" />
-          </div>
-          <p className="text-gray-600 mt-4 font-medium">Loading trips...</p>
-        </div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
   
   return (

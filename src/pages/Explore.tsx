@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
-import { Search, MapPin, Filter, Loader2, RefreshCw, Users, Compass, BookOpen, Server, AlertCircle, X } from 'lucide-react';
+import { Search, MapPin, Filter, Loader2, RefreshCw, Users, Compass, BookOpen, Server, AlertCircle, X, User } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -295,14 +295,22 @@ const FilterPanel = ({
   );
 };
 
-// Loading state component
-const LoadingState = () => (
-  <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
-    <div className="relative">
-      <div className="absolute -inset-1 rounded-full bg-gradient-to-r from-purple-600 to-indigo-600 animate-pulse blur-md opacity-75"></div>
-      <Loader2 className="w-12 h-12 animate-spin text-purple-600 relative" />
+const LoadingScreen = () => (
+  <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
+      <div className="relative">
+        <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full blur-sm opacity-70"></div>
+        <div className="h-32 w-32 rounded-full border-4 border-white relative bg-white flex items-center justify-center">
+          <div className="animate-[spin_3s_linear_infinite]">
+            <Compass className="h-16 w-16 text-purple-500" />
+          </div>
+        </div>
+      </div>
+      <div className="mt-6 text-center">
+        <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mx-auto mb-2"></div>
+        <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mx-auto"></div>
+      </div>
     </div>
-    <p className="text-gray-600 mt-4 font-medium">Loading content...</p>
   </div>
 );
 
@@ -362,7 +370,13 @@ const LoadMore = ({
   return (
     <div ref={loadMoreRef} className="flex justify-center mt-8 p-4">
       {isFetchingNextPage ? (
-        <Loader2 className="h-8 w-8 animate-spin text-purple-500" />
+        <div className="relative">
+          <div className="h-12 w-12 rounded-full border-2 border-white relative bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
+            <div className="animate-[spin_3s_linear_infinite]">
+              <Compass className="h-6 w-6 text-white" />
+            </div>
+          </div>
+        </div>
       ) : (
         <Button 
           variant="outline" 
@@ -876,6 +890,10 @@ const Explore = () => {
     return () => clearInterval(intervalId);
   }, [refetch]);
 
+  if (isLoading) {
+    return <LoadingScreen />;
+  }
+
   return (
     <div className="container max-w-screen-xl mx-auto px-4 pb-24 md:pb-12">
       <div className="min-h-screen">
@@ -924,11 +942,9 @@ const Explore = () => {
             />
           </div>
         </div>
-        
+
         {/* Content area */}
-        {isLoading ? (
-          <LoadingState />
-        ) : error ? (
+        {error ? (
           <ErrorState error={error as Error} onRetry={() => refetch()} />
         ) : !hasResults ? (
           <EmptyState onResetFilters={handleResetFilters} />

@@ -12,8 +12,8 @@ interface TripDiscussionProps {
   isApproved: boolean;
 }
 
-const TripDiscussion: React.FC<TripDiscussionProps> = ({
-  tripId,
+const TripDiscussion: React.FC<TripDiscussionProps> = ({ 
+  tripId, 
   tripName,
   isCreator,
   isApproved
