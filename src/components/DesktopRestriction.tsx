@@ -2,24 +2,31 @@ import React, { useEffect, useState } from 'react';
 import { Smartphone } from 'lucide-react';
 
 const DesktopRestriction = ({ children }: { children: React.ReactNode }) => {
-  const [isMobile, setIsMobile] = useState(false);
+  const [isMobile, setIsMobile] = useState(true); // Default to true to prevent flash of content
 
   useEffect(() => {
-    const checkScreenSize = () => {
-      // Check both width and user agent to ensure mobile devices
-      const isMobileWidth = window.innerWidth <= 768;
+    const checkDevice = () => {
+      // Check for mobile device using user agent
       const isMobileDevice = /iPhone|iPad|iPod|Android|webOS|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      setIsMobile(isMobileWidth && isMobileDevice);
+      
+      // Check for touch capability
+      const hasTouch = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+      
+      // Check screen width
+      const isMobileWidth = window.innerWidth <= 768;
+      
+      // Consider it mobile if either condition is true
+      setIsMobile(isMobileDevice || (hasTouch && isMobileWidth));
     };
 
     // Initial check
-    checkScreenSize();
+    checkDevice();
 
-    // Add event listener for window resize
-    window.addEventListener('resize', checkScreenSize);
+    // Add event listener for resize
+    window.addEventListener('resize', checkDevice);
 
     // Cleanup
-    return () => window.removeEventListener('resize', checkScreenSize);
+    return () => window.removeEventListener('resize', checkDevice);
   }, []);
 
   if (isMobile) {
@@ -27,7 +34,7 @@ const DesktopRestriction = ({ children }: { children: React.ReactNode }) => {
   }
 
   return (
-    <div className="fixed inset-0 bg-gradient-to-b from-blue-600 to-indigo-700 flex flex-col items-center justify-center text-white p-8 z-[9999]">
+    <div className="fixed inset-0 bg-gradient-to-b from-blue-600 to-indigo-700 flex flex-col items-center justify-center text-white p-8 z-[9999] overflow-y-auto">
       <div className="max-w-md text-center">
         <div className="bg-white/10 p-6 rounded-full w-24 h-24 mx-auto mb-6 flex items-center justify-center backdrop-blur-lg">
           <Smartphone className="w-12 h-12" />
@@ -41,7 +48,7 @@ const DesktopRestriction = ({ children }: { children: React.ReactNode }) => {
         
         <div className="bg-white/10 backdrop-blur-md rounded-lg p-6 border border-white/20">
           <h2 className="text-xl font-semibold mb-2">Access on Mobile</h2>
-          <p className="text-base opacity-80">
+          <p className="text-base opacity-80 mb-4">
             Scan the QR code below with your mobile device to access Hireyth.
           </p>
           
@@ -52,6 +59,10 @@ const DesktopRestriction = ({ children }: { children: React.ReactNode }) => {
               className="w-36 h-36"
             />
           </div>
+          
+          <p className="text-sm mt-4 opacity-70">
+            For the best experience, please use your smartphone to access Hireyth.
+          </p>
         </div>
       </div>
     </div>

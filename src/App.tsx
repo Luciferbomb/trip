@@ -613,7 +613,9 @@ const App = () => {
           <ToastProvider>
             <Router>
               <GenerateFavicon />
-              <AppContent />
+              <DesktopRestriction>
+                <AppContent />
+              </DesktopRestriction>
               <Toaster />
             </Router>
           </ToastProvider>
