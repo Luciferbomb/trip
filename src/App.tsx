@@ -24,6 +24,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Header } from './components/Header';
 import DesktopRestriction from './components/DesktopRestriction';
 import { Toaster } from './components/ui/toaster';
+import { GenerateFavicon } from './components/GenerateFavicon';
 
 // Simple scrollToTop function
 const scrollToTop = (smooth = true) => {
@@ -606,20 +607,19 @@ const App = () => {
   }
   
   return (
-    <QueryClientProvider client={queryClient}>
-      <ToastProvider>
+    <ErrorBoundary>
+      <QueryClientProvider client={queryClient}>
         <AuthProvider>
-          <Router>
-            <ErrorBoundary>
-              <DesktopRestriction>
-                <AppContent />
-              </DesktopRestriction>
-            </ErrorBoundary>
-          </Router>
+          <ToastProvider>
+            <Router>
+              <GenerateFavicon />
+              <AppContent />
+              <Toaster />
+            </Router>
+          </ToastProvider>
         </AuthProvider>
-      </ToastProvider>
-      <Toaster />
-    </QueryClientProvider>
+      </QueryClientProvider>
+    </ErrorBoundary>
   );
 };
 

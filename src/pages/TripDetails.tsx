@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Heart, Edit, Loader2, UserPlus, UserMinus, Check, X, Trash2, ChevronLeft, AlertTriangle, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Calendar, MapPin, Users, Clock, Share2, Heart, Edit, Loader2, UserPlus, UserMinus, Check, X, Trash2, ChevronLeft, AlertTriangle, MessageCircle, Plane } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -36,6 +36,7 @@ import Chat from '@/components/Chat';
 import { AlertCircle } from 'lucide-react';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { BackgroundGradient } from "@/components/ui/background-gradient";
+import { GradientLoader } from '@/components/ui/gradient-loader';
 
 interface Participant {
   id: string;
@@ -481,10 +482,7 @@ const TripDetails = () => {
     return (
     <div className="min-h-screen bg-gray-50 pb-20 pt-16">
       {loading ? (
-        <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)]">
-          <Loader2 className="w-8 h-8 animate-spin text-hireyth-main mb-4" />
-          <p className="text-gray-600">Loading trip details...</p>
-        </div>
+        <LoadingState />
       ) : error || !trip ? (
         <div className="flex flex-col items-center justify-center py-12 px-4 text-center min-h-screen bg-gray-50 pt-16">
           <BackgroundGradient className="rounded-[22px] bg-white dark:bg-zinc-900 p-6 max-w-lg w-full">
@@ -503,134 +501,134 @@ const TripDetails = () => {
       ) : (
         <div className="max-w-4xl mx-auto px-4">
           <BackgroundGradient className="rounded-[22px] bg-white dark:bg-zinc-900 overflow-hidden mb-6">
-            {/* Trip Image */}
+      {/* Trip Image */}
             <div className="relative aspect-[16/9] overflow-hidden">
-              <img 
-                src={trip.image_url}
-                alt={trip.title} 
-                className="w-full h-full object-cover"
-              />
-              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
-              
-              {/* Creator Info - Overlaid on image */}
-              <div className="absolute bottom-4 left-4 flex items-center">
-                <Link to={`/profile/${trip.creator_username}`} className="flex items-center">
+        <img 
+          src={trip.image_url}
+          alt={trip.title} 
+          className="w-full h-full object-cover"
+        />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+            
+            {/* Creator Info - Overlaid on image */}
+            <div className="absolute bottom-4 left-4 flex items-center">
+              <Link to={`/profile/${trip.creator_username}`} className="flex items-center">
                   <Avatar className="h-10 w-10 border-2 border-white">
                     <AvatarImage 
-                      src={trip.creator_image}
-                      alt={trip.creator_name}
+                  src={trip.creator_image}
+                  alt={trip.creator_name}
                       className="object-cover"
-                    />
+                />
                     <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
                       {trip.creator_name.charAt(0)}
                     </AvatarFallback>
                   </Avatar>
-                  <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
-                </Link>
-              </div>
+                <span className="ml-2 text-white text-sm font-medium">{trip.creator_name}</span>
+              </Link>
             </div>
+        </div>
 
-            {/* Trip Details */}
+          {/* Trip Details */}
             <div className="p-6">
-              <div className="flex justify-between items-start mb-4">
-                <h1 className="text-2xl font-bold text-gray-900">{trip.title}</h1>
-                <div className="flex items-center gap-2">
-                  <Button 
-                    variant="outline" 
+            <div className="flex justify-between items-start mb-4">
+              <h1 className="text-2xl font-bold text-gray-900">{trip.title}</h1>
+              <div className="flex items-center gap-2">
+              <Button 
+                variant="outline" 
+                  size="sm"
+                  onClick={handleShare}
+              >
+                  <Share2 className="w-4 h-4 mr-2" />
+                  Share
+              </Button>
+                {user?.id === trip.creator_id && (
+              <Button 
+                    variant="destructive"
                     size="sm"
-                    onClick={handleShare}
-                  >
-                    <Share2 className="w-4 h-4 mr-2" />
-                    Share
-                  </Button>
-                  {user?.id === trip.creator_id && (
-                    <Button 
-                      variant="destructive"
-                      size="sm"
-                      onClick={() => setShowDeleteConfirm(true)}
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete
-                    </Button>
-                  )}
-                </div>
+                onClick={() => setShowDeleteConfirm(true)}
+              >
+                    <Trash2 className="w-4 h-4 mr-2" />
+                    Delete
+              </Button>
+                )}
+        </div>
+      </div>
+      
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+        <div className="flex items-center text-gray-600 mb-4">
+                  <MapPin className="w-5 h-5 mr-2" />
+          <span>{trip.location}</span>
+        </div>
+        
+                <div className="flex items-center text-gray-600 mb-4">
+                  <Calendar className="w-5 h-5 mr-2" />
+                  <span>
+                    {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
+            </span>
+          </div>
+          
+                <div className="flex items-center text-gray-600">
+                  <Users className="w-5 h-5 mr-2" />
+                  <span>
+                    {participants.filter(p => p.status === 'approved').length} / {trip.spots} spots filled
+            </span>
+          </div>
+        </div>
+        
+            <div>
+                <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
+                <p className="text-gray-600">{trip.description}</p>
               </div>
-              
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <div className="flex items-center text-gray-600 mb-4">
-                    <MapPin className="w-5 h-5 mr-2" />
-                    <span>{trip.location}</span>
-                  </div>
-                  
-                  <div className="flex items-center text-gray-600 mb-4">
-                    <Calendar className="w-5 h-5 mr-2" />
-                    <span>
-                      {format(new Date(trip.start_date), 'MMM d, yyyy')} - {format(new Date(trip.end_date), 'MMM d, yyyy')}
-                    </span>
-                  </div>
-                  
-                  <div className="flex items-center text-gray-600">
-                    <Users className="w-5 h-5 mr-2" />
-                    <span>
-                      {participants.filter(p => p.status === 'approved').length} / {trip.spots} spots filled
-                    </span>
-                  </div>
-                </div>
-                
-                <div>
-                  <h3 className="font-semibold text-gray-900 mb-2">Description</h3>
-                  <p className="text-gray-600">{trip.description}</p>
-                </div>
-              </div>
+          </div>
             </div>
           </BackgroundGradient>
-
-          {/* Join/Status Button */}
-          <div className="mt-6 flex justify-center">
-            {user?.id === trip.creator_id ? (
+          
+            {/* Join/Status Button */}
+            <div className="mt-6 flex justify-center">
+              {user?.id === trip.creator_id ? (
+                <Button
+                  variant="outline"
+                  onClick={() => setShowParticipants(true)}
+                >
+                  <Users className="w-4 h-4 mr-2" />
+                  Manage Participants
+                </Button>
+              ) : userParticipation ? (
               <Button
-                variant="outline"
-                onClick={() => setShowParticipants(true)}
-              >
-                <Users className="w-4 h-4 mr-2" />
-                Manage Participants
-              </Button>
-            ) : userParticipation ? (
-            <Button
-                variant="outline"
-                disabled
-              >
-                {userParticipation.status === 'approved' ? (
-                  <>
-                    <Check className="w-4 h-4 mr-2" />
-                    Joined
+                  variant="outline"
+                  disabled
+                >
+                  {userParticipation.status === 'approved' ? (
+                    <>
+                      <Check className="w-4 h-4 mr-2" />
+                      Joined
+                    </>
+                  ) : userParticipation.status === 'pending' ? (
+                    <>
+                      <Clock className="w-4 h-4 mr-2" />
+                      Request Pending
                   </>
-                ) : userParticipation.status === 'pending' ? (
-                  <>
-                    <Clock className="w-4 h-4 mr-2" />
-                    Request Pending
-                </>
-              ) : (
-                <>
-                    <X className="w-4 h-4 mr-2" />
-                    Request Rejected
-                </>
-              )}
-            </Button>
-            ) : (
-              <Button
-                onClick={handleJoinTrip}
-                disabled={joining}
-              >
-                {joining ? (
-                  <Loader2 className="w-4 h-4 animate-spin mr-2" />
                 ) : (
-                  <UserPlus className="w-4 h-4 mr-2" />
+                  <>
+                      <X className="w-4 h-4 mr-2" />
+                      Request Rejected
+                  </>
                 )}
-                Join Trip
               </Button>
-            )}
+              ) : (
+                <Button
+                  onClick={handleJoinTrip}
+                  disabled={joining}
+                >
+                  {joining ? (
+                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                  ) : (
+                    <UserPlus className="w-4 h-4 mr-2" />
+                  )}
+                  Join Trip
+                </Button>
+              )}
           </div>
 
           {/* Participants Section */}
@@ -662,8 +660,8 @@ const TripDetails = () => {
                         </AvatarFallback>
                       </Avatar>
                       <div>
-                        <Link 
-                          to={`/profile/${participant.user.username}`}
+                  <Link 
+                    to={`/profile/${participant.user.username}`}
                           className="font-medium text-gray-900 hover:text-blue-600"
                         >
                           {participant.user.name}
@@ -690,30 +688,30 @@ const TripDetails = () => {
                         >
                           <Check className="h-4 w-4" />
                         </Button>
-                        <Button
-                          variant="outline"
-                          size="sm"
+            <Button 
+              variant="outline"
+              size="sm"
                           className="text-red-600 hover:text-red-700"
                           onClick={() => handleParticipantAction(participant.id, 'reject')}
                           disabled={actionLoading === participant.id}
-                        >
+            >
                           <X className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    )}
-                  </div>
+            </Button>
+                </div>
+              )}
+            </div>
                 ))}
                 
                 {participants.length > 3 && (
-                  <Button 
-                    variant="outline" 
+                  <Button
+                    variant="outline"
                     className="w-full mt-2"
                     onClick={() => setShowParticipants(true)}
                   >
                     View All {participants.length} Participants
                   </Button>
                 )}
-              </div>
+            </div>
             </BackgroundGradient>
           )}
 
@@ -806,5 +804,17 @@ const TripDetails = () => {
     </div>
   );
 };
+
+const LoadingState = () => (
+  <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
+      <GradientLoader size="lg" icon="plane" />
+      <div className="mt-6 text-center">
+        <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mx-auto mb-2"></div>
+        <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mx-auto"></div>
+      </div>
+    </div>
+  </div>
+);
 
 export default TripDetails; 

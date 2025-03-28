@@ -20,6 +20,7 @@ import MapboxSearch from '@/components/MapboxSearch';
 import VerificationBadge from '@/components/VerificationBadge';
 import { AnimatedTabs } from "@/components/ui/animated-tabs";
 import { BackgroundGradient } from "@/components/ui/background-gradient";
+import { GradientLoader } from '@/components/ui/gradient-loader';
 
 // Common types used across components
 interface Trip {
@@ -295,17 +296,10 @@ const FilterPanel = ({
   );
 };
 
-const LoadingScreen = () => (
+const LoadingState = () => (
   <div className="min-h-screen bg-gray-50">
     <div className="flex flex-col items-center justify-center h-[calc(100vh-64px)] mt-16">
-      <div className="relative">
-        <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full blur-sm opacity-70"></div>
-        <div className="h-32 w-32 rounded-full border-4 border-white relative bg-white flex items-center justify-center">
-          <div className="animate-[spin_3s_linear_infinite]">
-            <Compass className="h-16 w-16 text-purple-500" />
-          </div>
-        </div>
-      </div>
+      <GradientLoader size="lg" icon="compass" />
       <div className="mt-6 text-center">
         <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mx-auto mb-2"></div>
         <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mx-auto"></div>
@@ -370,13 +364,7 @@ const LoadMore = ({
   return (
     <div ref={loadMoreRef} className="flex justify-center mt-8 p-4">
       {isFetchingNextPage ? (
-        <div className="relative">
-          <div className="h-12 w-12 rounded-full border-2 border-white relative bg-gradient-to-br from-purple-500 to-indigo-600 flex items-center justify-center">
-            <div className="animate-[spin_3s_linear_infinite]">
-              <Compass className="h-6 w-6 text-white" />
-            </div>
-          </div>
-        </div>
+        <GradientLoader size="sm" icon="spinner" />
       ) : (
         <Button 
           variant="outline" 
@@ -474,20 +462,17 @@ const ContentRenderer = ({
       {/* Experience Cards */}
       {(activeTab === 'all' || activeTab === 'experiences') && data.experiences.map(exp => (
         <BackgroundGradient key={exp.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
-          <div 
-            className="overflow-hidden cursor-pointer"
-            onClick={() => navigate(`/experiences/${exp.id}`)}
-          >
+          <div className="overflow-hidden relative">
             <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
               {exp.image_url ? (
                 <img 
                   src={exp.image_url} 
                   alt={exp.title} 
-                  className="h-full w-full object-cover transition-transform hover:scale-105"
+                  className="h-full w-full object-cover"
                 />
               ) : (
                 <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
-                  <BookOpen className="h-12 w-12 text-purple-300" />
+                  <MapPin className="h-12 w-12 text-purple-300" />
                 </div>
               )}
               <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-4 pt-12">
@@ -498,43 +483,34 @@ const ContentRenderer = ({
                 </div>
               </div>
             </div>
+            
             <div className="p-4">
               <p className="mb-3 line-clamp-2 text-sm text-gray-600">{exp.description}</p>
               <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Link to={`/profile/${exp.user.username}`} onClick={(e) => e.stopPropagation()} className="block">
-                    <Avatar className="h-8 w-8 border border-gray-200">
-                      <AvatarImage src={exp.user.profile_image} alt={exp.user.name} />
+                <Link 
+                  to={`/profile/${exp.user?.username}`}
+                  className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+                >
+                  <Avatar className="h-8 w-8 border border-gray-200">
+                    {exp.user?.profile_image ? (
+                      <AvatarImage 
+                        src={exp.user.profile_image} 
+                        alt={exp.user.name}
+                        className="object-cover"
+                      />
+                    ) : (
                       <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-600 text-white">
-                        {exp.user.name.charAt(0)}
+                        {exp.user?.name ? exp.user.name[0] : '?'}
                       </AvatarFallback>
-                    </Avatar>
-                  </Link>
+                    )}
+                  </Avatar>
                   <div>
-                    <Link 
-                      to={`/profile/${exp.user.username}`} 
-                      onClick={(e) => e.stopPropagation()}
-                      className="flex items-center gap-1 text-sm font-medium hover:underline"
-                    >
-                      {exp.user.name}
-                      {exp.user.is_verified && <VerificationBadge size="sm" />}
-                    </Link>
+                    <p className="text-sm font-medium">{exp.user?.name}</p>
                     <span className="text-xs text-gray-500">
                       {format(new Date(exp.created_at), 'MMM d, yyyy')}
                     </span>
                   </div>
-                </div>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className="text-xs"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    navigate(`/experiences/${exp.id}`);
-                  }}
-                >
-                  View details
-                </Button>
+                </Link>
               </div>
             </div>
           </div>
@@ -891,7 +867,7 @@ const Explore = () => {
   }, [refetch]);
 
   if (isLoading) {
-    return <LoadingScreen />;
+    return <LoadingState />;
   }
 
   return (
@@ -910,8 +886,8 @@ const Explore = () => {
             {/* Search bar */}
             <SearchBar 
               searchQuery={searchQuery} 
-              onChange={handleSearchChange}
-            />
+                  onChange={handleSearchChange}
+                />
             
             {/* Navigation tabs */}
             <NavigationTabs 

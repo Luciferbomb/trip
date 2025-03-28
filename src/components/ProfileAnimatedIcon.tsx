@@ -8,29 +8,29 @@ type IconVariant = 'default' | 'light';
 
 const sizeMap = {
   xs: {
-    container: 'h-7 w-7',
-    iconSize: 14,
-    pinSize: 4,
+    container: 'h-8 w-8',
+    iconSize: 16,
+    pinSize: 5,
   },
   sm: {
-    container: 'h-9 w-9',
-    iconSize: 18,
-    pinSize: 5,
+    container: 'h-10 w-10',
+    iconSize: 20,
+    pinSize: 6,
   },
   md: {
     container: 'h-12 w-12',
-    iconSize: 22,
-    pinSize: 6,
+    iconSize: 24,
+    pinSize: 7,
   },
   lg: {
     container: 'h-16 w-16',
-    iconSize: 30,
-    pinSize: 8,
+    iconSize: 32,
+    pinSize: 9,
   },
   xl: {
     container: 'h-20 w-20',
-    iconSize: 36,
-    pinSize: 9,
+    iconSize: 40,
+    pinSize: 10,
   },
 };
 

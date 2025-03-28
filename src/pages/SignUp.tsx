@@ -293,7 +293,7 @@ const SignUp = () => {
                           <Input
                             placeholder="Enter your email"
                             className={cn(
-                              "glass-button pl-10 h-12 placeholder:text-white/40 text-white focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 modern-focus rounded-lg border-white/40",
+                              "glass-button pl-10 h-12 placeholder:text-white/40 text-white bg-white/10 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 modern-focus rounded-lg border-white/40",
                               form.formState.errors.email && "border-red-400"
                             )}
                             {...field}
@@ -320,7 +320,7 @@ const SignUp = () => {
                             type={showPassword ? "text" : "password"}
                             placeholder="Enter your password"
                             className={cn(
-                              "glass-button pl-10 pr-10 h-12 placeholder:text-white/40 text-white focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 modern-focus rounded-lg border-white/40",
+                              "glass-button pl-10 pr-10 h-12 placeholder:text-white/40 text-white bg-white/10 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 modern-focus rounded-lg border-white/40",
                               form.formState.errors.password && "border-red-400"
                             )}
                             {...field}

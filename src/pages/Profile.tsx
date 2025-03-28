@@ -26,6 +26,8 @@ import { format } from 'date-fns';
 import VerificationBadge from '@/components/VerificationBadge';
 import InlineVerifiedBadge from '@/components/InlineVerifiedBadge';
 import { BackgroundGradient } from "@/components/ui/background-gradient";
+import { GradientLoader } from "@/components/ui/gradient-loader";
+import ProfileAnimatedIcon from "@/components/ProfileAnimatedIcon";
 
 interface UserProfile {
   id: string;
@@ -133,21 +135,18 @@ interface DatabaseFollowingResponse {
 const MAPBOX_ACCESS_TOKEN = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN;
 mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
 
-const LoadingScreen = () => (
-  <div className="min-h-screen bg-gray-50 pb-20">
-    <BottomNav />
-    <div className="flex flex-col items-center justify-center pt-20 h-[60vh]">
-      <div className="relative">
-        <div className="absolute -inset-1 bg-gradient-to-br from-purple-500 to-indigo-600 rounded-full blur-sm opacity-70"></div>
-        <Avatar className="h-32 w-32 border-4 border-white relative">
-          <AvatarFallback className="bg-gradient-to-br from-purple-400 to-indigo-500">
-            <User className="h-12 w-12 text-white" />
-          </AvatarFallback>
-        </Avatar>
-      </div>
-      <div className="mt-6 text-center">
-        <div className="h-4 w-32 bg-gray-200 rounded animate-pulse mx-auto mb-2"></div>
-        <div className="h-3 w-24 bg-gray-100 rounded animate-pulse mx-auto"></div>
+const LoadingState = () => (
+  <div className="min-h-screen bg-gray-50">
+    <div className="flex flex-col items-center justify-center min-h-screen">
+      <div className="flex flex-col items-center space-y-6">
+        <div className="relative">
+          <div className="absolute inset-0 bg-gradient-to-r from-violet-600 to-indigo-600 blur-2xl opacity-20 rounded-full"></div>
+          <ProfileAnimatedIcon size="xl" animated={true} isActive={true} className="scale-150" />
+        </div>
+        <div className="space-y-4 text-center">
+          <div className="h-4 w-48 bg-gray-200 rounded animate-pulse"></div>
+          <div className="h-3 w-32 bg-gray-100 rounded animate-pulse"></div>
+        </div>
       </div>
     </div>
   </div>
@@ -1262,16 +1261,13 @@ const Profile = () => {
     
     return (
       <BackgroundGradient key={experience.id} className="rounded-[22px] bg-white dark:bg-zinc-900">
-        <div 
-          className="overflow-hidden cursor-pointer relative"
-          onClick={() => navigate(`/experiences/${experience.id}`)}
-        >
+        <div className="overflow-hidden relative">
           <div className="relative h-48 w-full overflow-hidden rounded-t-[18px]">
             {experience.image_url ? (
               <img 
                 src={experience.image_url} 
                 alt={experience.title} 
-                className="h-full w-full object-cover transition-transform hover:scale-105"
+                className="h-full w-full object-cover"
               />
             ) : (
               <div className="flex h-full w-full items-center justify-center bg-gradient-to-br from-purple-100 to-indigo-100">
@@ -1290,7 +1286,10 @@ const Profile = () => {
           <div className="p-4">
             <p className="mb-3 line-clamp-2 text-sm text-gray-600">{experience.description}</p>
             <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
+              <Link 
+                to={`/profile/${experience.user?.username}`}
+                className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+              >
                 <Avatar className="h-8 w-8 border border-gray-200">
                   {experience.user?.profile_image ? (
                     <AvatarImage 
@@ -1305,23 +1304,12 @@ const Profile = () => {
                   )}
                 </Avatar>
                 <div>
-                  <p className="text-sm font-medium">{experience.user?.name || 'Unknown User'}</p>
+                  <p className="text-sm font-medium">{experience.user?.name}</p>
                   <span className="text-xs text-gray-500">
                     {format(new Date(experience.created_at), 'MMM d, yyyy')}
                   </span>
                 </div>
-              </div>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="text-xs"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleDeleteExperience(experience.id);
-                }}
-              >
-                View details
-              </Button>
+              </Link>
             </div>
           </div>
           
@@ -1346,7 +1334,7 @@ const Profile = () => {
   };
 
   if (loading) {
-    return <LoadingScreen />;
+    return <LoadingState />;
   }
 
   if (!user) {

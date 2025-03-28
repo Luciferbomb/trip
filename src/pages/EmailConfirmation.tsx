@@ -75,9 +75,9 @@ const EmailConfirmation = () => {
               });
               console.log('Session set successfully');
               
-              // Wait a moment before redirecting to ensure session is set
+              // Redirect to onboarding instead of login
               setTimeout(() => {
-                navigate('/login?confirmed=true');
+                navigate('/onboarding');
               }, 2000);
               return;
             } catch (sessionError) {

@@ -29,17 +29,17 @@ export function BottomNav({ className }: BottomNavProps) {
   const navItems: NavItem[] = [
     {
       // Use TripAnimatedIcon instead of TripIcon
-      icon: <TripAnimatedIcon size="xs" animated={true} isActive={true} />,
+      icon: <TripAnimatedIcon size="sm" animated={true} isActive={true} />,
       path: "/trips",
     },
     {
-      icon: <HireythLogo size="xs" animate={true} />,
+      icon: <HireythLogo size="sm" animate={true} />,
       path: "/explore",
       isLogo: true
     },
     {
       // Use new ProfileAnimatedIcon instead of ProfileTravelIcon
-      icon: <ProfileAnimatedIcon size="xs" animated={true} isActive={true} />,
+      icon: <ProfileAnimatedIcon size="sm" animated={true} isActive={true} />,
       path: "/profile",
     },
   ]
@@ -106,10 +106,10 @@ export function BottomNav({ className }: BottomNavProps) {
                           duration: 2,
                         }}
                       />
-                      <HireythLogoAnimated size="xs" animated={true} />
+                      <HireythLogoAnimated size="sm" animated={true} />
                     </div>
                   ) : (
-                    <HireythLogo size="xs" animate={false} />
+                    <HireythLogo size="sm" animate={false} />
                   )}
                 </motion.div>
               ) : (

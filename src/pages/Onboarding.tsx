@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Camera, CheckCircle, ChevronRight, Instagram, Linkedin } from 'lucide-react';
+import { Camera, CheckCircle, ChevronRight, Instagram, Linkedin, MapPin, ArrowLeft, Upload, Calendar, Check, ChevronsUpDown, Plus, Loader2, ArrowRight } from 'lucide-react';
 import { Button } from '../components/ui/button';
 import { Input } from '../components/ui/input';
 import { Label } from '../components/ui/label';
@@ -10,12 +10,42 @@ import { useToast } from '../components/ui/use-toast';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth-context';
 import { Header } from '../components/Header';
+import mapboxgl from 'mapbox-gl';
+import MapboxGeocoder from '@mapbox/mapbox-gl-geocoder';
+import '@mapbox/mapbox-gl-geocoder/dist/mapbox-gl-geocoder.css';
+import 'mapbox-gl/dist/mapbox-gl.css';
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { Calendar as CalendarComponent } from '@/components/ui/calendar';
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { format } from 'date-fns';
+import { cn } from '@/lib/utils';
+import { v4 as uuidv4 } from 'uuid';
+import { Command, CommandEmpty, CommandGroup, CommandItem, CommandList } from '@/components/ui/command';
+import { Badge } from '@/components/ui/badge';
+import { Combobox } from '@headlessui/react';
+import MapboxSearch from '@/components/MapboxSearch';
+
+// Set your Mapbox token
+mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
 
 const Onboarding = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const mapContainerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<mapboxgl.Map | null>(null);
+  const markerRef = useRef<mapboxgl.Marker | null>(null);
   
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(false);
@@ -163,6 +193,70 @@ const Onboarding = () => {
     
     fetchUserData();
   }, [user, navigate]);
+
+  // Initialize map when component mounts
+  useEffect(() => {
+    if (currentStep === 4 && mapContainerRef.current && !mapRef.current) {
+      const map = new mapboxgl.Map({
+        container: 'mapbox-container',
+        style: 'mapbox://styles/mapbox/streets-v12',
+        center: [0, 0],
+        zoom: 1
+      });
+
+      mapRef.current = map;
+
+      // Add navigation controls
+      map.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+      // Add geocoder control
+      const geocoder = new MapboxGeocoder({
+        accessToken: mapboxgl.accessToken,
+        mapboxgl: mapboxgl,
+        marker: false,
+        placeholder: 'Search for a location...'
+      });
+
+      map.addControl(geocoder);
+
+      // Listen for geocoder result
+      geocoder.on('result', (e) => {
+        const { result } = e;
+        const location = result.place_name;
+        const [lng, lat] = result.center;
+
+        // Update location in state
+        handleInputChange('experience.location', location);
+
+        // Add or update marker
+        if (markerRef.current) {
+          markerRef.current.setLngLat([lng, lat]);
+        } else {
+          markerRef.current = new mapboxgl.Marker()
+            .setLngLat([lng, lat])
+            .addTo(map);
+        }
+
+        // Fly to location
+        map.flyTo({
+          center: [lng, lat],
+          zoom: 12,
+          essential: true
+        });
+      });
+
+      return () => {
+        if (mapRef.current) {
+          mapRef.current.remove();
+          mapRef.current = null;
+        }
+        if (markerRef.current) {
+          markerRef.current.remove();
+          markerRef.current = null;
+        }
+      };
+    }
+  }, [currentStep]);
 
   const handleInputChange = (field: string, value: string) => {
     if (field.includes('.')) {
@@ -482,7 +576,7 @@ const Onboarding = () => {
                   onChange={(e) => handleInputChange('name', e.target.value)}
                   placeholder="Your full name"
                   required
-                  className="glass-button pl-3 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                  className="glass-button pl-3 h-12 text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
                 />
               </div>
             </div>
@@ -496,7 +590,7 @@ const Onboarding = () => {
                   onChange={(e) => handleInputChange('username', e.target.value.toLowerCase())}
                   placeholder="Choose a unique username"
                   required
-                  className="glass-button pl-3 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                  className="glass-button pl-3 h-12 text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
                 />
               </div>
               <p className="text-sm text-white/60 mt-1">
@@ -512,7 +606,7 @@ const Onboarding = () => {
                   value={profileData.location}
                   onChange={(e) => handleInputChange('location', e.target.value)}
                   placeholder="City, Country"
-                  className="glass-button pl-3 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                  className="glass-button pl-3 h-12 text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
                 />
               </div>
             </div>
@@ -546,7 +640,7 @@ const Onboarding = () => {
                 value={profileData.bio}
                 onChange={(e) => handleInputChange('bio', e.target.value)}
                 placeholder="Tell us about yourself..."
-                className="glass-button min-h-[100px] text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                className="glass-button min-h-[100px] text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
               />
             </div>
           </div>
@@ -620,7 +714,7 @@ const Onboarding = () => {
                   value={profileData.instagram}
                   onChange={(e) => handleInputChange('instagram', e.target.value)}
                   placeholder="Your Instagram username"
-                  className="glass-button pl-10 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                  className="glass-button pl-10 h-12 text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
                 />
               </div>
             </div>
@@ -636,7 +730,7 @@ const Onboarding = () => {
                   value={profileData.linkedin}
                   onChange={(e) => handleInputChange('linkedin', e.target.value)}
                   placeholder="Your LinkedIn username"
-                  className="glass-button pl-10 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                  className="glass-button pl-10 h-12 text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
                 />
               </div>
             </div>
@@ -656,18 +750,15 @@ const Onboarding = () => {
                 value={profileData.experience.title}
                 onChange={(e) => handleInputChange('experience.title', e.target.value)}
                 placeholder="e.g., Hiking in the Alps"
-                className="glass-button pl-3 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                className="glass-button pl-3 h-12 text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
               />
             </div>
             
             <div className="space-y-2">
-              <Label htmlFor="exp-location" className="text-white text-sm font-medium">Location</Label>
-              <Input
-                id="exp-location"
-                value={profileData.experience.location}
-                onChange={(e) => handleInputChange('experience.location', e.target.value)}
-                placeholder="Where did this experience take place?"
-                className="glass-button pl-3 h-12 text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+              <Label className="text-white text-sm font-medium">Experience Location</Label>
+              <MapboxSearch 
+                onLocationSelect={handleLocationSelect}
+                className="w-full"
               />
             </div>
             
@@ -678,7 +769,7 @@ const Onboarding = () => {
                 value={profileData.experience.description}
                 onChange={(e) => handleInputChange('experience.description', e.target.value)}
                 placeholder="Tell us about this experience..."
-                className="glass-button min-h-[100px] text-white placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
+                className="glass-button min-h-[100px] text-white bg-white/10 placeholder:text-white/40 focus:border-white/40 focus-visible:ring-1 focus-visible:ring-white/50 rounded-lg"
               />
             </div>
             
@@ -726,6 +817,16 @@ const Onboarding = () => {
       default:
         return null;
     }
+  };
+
+  const handleLocationSelect = (locationData: { name: string; coordinates: [number, number]; country: string }) => {
+    setProfileData({
+      ...profileData,
+      experience: {
+        ...profileData.experience,
+        location: locationData.name
+      }
+    });
   };
 
   return (
