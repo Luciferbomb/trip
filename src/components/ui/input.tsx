@@ -19,7 +19,9 @@ const Input = React.forwardRef<HTMLInputElement, React.ComponentProps<"input">>(
           "[&::-webkit-inner-spin-button]:appearance-none",
           "dark:bg-gray-800 dark:border-gray-700",
           "dark:placeholder-gray-400",
-          "mobile:text-base mobile:text-black dark:mobile:text-white",
+          "text-black dark:text-white",
+          "mobile:text-black dark:mobile:text-white",
+          "ios:text-black dark:ios:text-white",
           className
         )}
         ref={ref}

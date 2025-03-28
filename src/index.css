@@ -7,30 +7,30 @@
 
 @layer base {
   :root {
-    --background: 210 50% 98%;
-    --foreground: 224 71% 4%;
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
 
     /* Vibrant blue and purple theme */
-    --primary: 265 89% 60%; /* More purple */
+    --primary: 222.2 47.4% 11.2%;
     --primary-foreground: 210 40% 98%;
 
-    --secondary: 210 40% 96%;
+    --secondary: 210 40% 96.1%;
     --secondary-foreground: 222.2 47.4% 11.2%;
 
-    --muted: 210 40% 96%;
+    --muted: 210 40% 96.1%;
     --muted-foreground: 215.4 16.3% 46.9%;
 
-    --accent: 262 83% 58%; /* More vibrant purple */
-    --accent-foreground: 210 40% 98%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
 
     --destructive: 0 84.2% 60.2%;
     --destructive-foreground: 210 40% 98%;
 
     --border: 214.3 31.8% 91.4%;
     --input: 214.3 31.8% 91.4%;
-    --ring: 262 83% 58%; /* Match accent */
+    --ring: 215 20.2% 65.1%;
 
-    --radius: 0.75rem; /* Slightly larger radius */
+    --radius: 0.5rem;
 
     /* Updated hireyth colors to vibrant blue-purple theme */
     --hireyth-main: 262 83% 58%; /* Main purple */
@@ -90,8 +90,8 @@
     --foreground: 210 40% 98%;
 
     /* Updated dark theme with purple emphasis */
-    --primary: 265 89% 65%; /* Bright purple for dark theme */
-    --primary-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
 
     --secondary: 217.2 32.6% 17.5%;
     --secondary-foreground: 210 40% 98%;
@@ -99,15 +99,15 @@
     --muted: 217.2 32.6% 17.5%;
     --muted-foreground: 215 20.2% 65.1%;
 
-    --accent: 262 83% 68%; /* Vibrant purple */
+    --accent: 217.2 32.6% 17.5%;
     --accent-foreground: 210 40% 98%;
 
     --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive-foreground: 0 85.7% 97.3%;
 
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
-    --ring: 262 83% 65%;
+    --ring: 217.2 32.6% 17.5%;
 
     /* Dark theme card */
     --card: 222.2 84% 4.9%;
@@ -134,6 +134,11 @@
   
   ::selection {
     @apply bg-primary/20 text-primary;
+  }
+
+  input, textarea {
+    -webkit-text-fill-color: currentColor !important;
+    opacity: 1 !important;
   }
 }
 
@@ -854,4 +859,11 @@ input:focus, textarea:focus, select:focus {
 
 .animate-fade-in-up {
   animation: fadeInUp 0.3s ease-out forwards;
+}
+
+/* iOS-specific styles */
+@supports (-webkit-touch-callout: none) {
+  input, textarea {
+    color-scheme: light dark;
+  }
 }
