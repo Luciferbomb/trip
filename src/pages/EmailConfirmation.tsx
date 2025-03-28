@@ -60,12 +60,6 @@ const EmailConfirmation = () => {
           setStatus('success');
           setMessage('Your email has been successfully confirmed!');
           
-          // Create a toast notification
-          toast({
-            title: 'Email Confirmed',
-            description: 'Your account has been successfully activated. You can now log in.',
-          });
-          
           // Force refresh the session
           if (accessToken && refreshToken) {
             try {
@@ -75,7 +69,7 @@ const EmailConfirmation = () => {
               });
               console.log('Session set successfully');
               
-              // Redirect to onboarding instead of login
+              // Redirect to onboarding
               setTimeout(() => {
                 navigate('/onboarding');
               }, 2000);
@@ -84,7 +78,6 @@ const EmailConfirmation = () => {
               console.error('Error setting session:', sessionError);
             }
           }
-          
           return;
         }
         

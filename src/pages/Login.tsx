@@ -35,12 +35,17 @@ const Login = () => {
   useEffect(() => {
     const urlParams = new URLSearchParams(location.search);
     if (urlParams.get('confirmed') === 'true') {
+      // Show toast only once
       toast({
         title: 'Email confirmed!',
         description: 'Your email has been confirmed. You can now log in.',
       });
+      
+      // Clear the URL parameter
+      const newUrl = window.location.pathname;
+      window.history.replaceState({}, '', newUrl);
     }
-  }, [location, toast]);
+  }, [toast]); // Remove location from dependencies to prevent multiple runs
   
   useEffect(() => {
     if (user) {

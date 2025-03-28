@@ -36,7 +36,7 @@ import { Combobox } from '@headlessui/react';
 import MapboxSearch from '@/components/MapboxSearch';
 
 // Set your Mapbox token
-mapboxgl.accessToken = process.env.NEXT_PUBLIC_MAPBOX_TOKEN || '';
+mapboxgl.accessToken = import.meta.env.VITE_MAPBOX_ACCESS_TOKEN || '';
 
 const Onboarding = () => {
   const { user } = useAuth();
